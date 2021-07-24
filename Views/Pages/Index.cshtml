@@ -1,0 +1,39 @@
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<style>
+    .flex-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+</style>
+
+<body>
+    <div>
+        <h1>Welcome to the Online Building Game!</h1>
+    </div>
+    <div class="flex-container">
+        <div>
+            <h2 id="toggleLogin">Log in:</h2>
+            <div id="loginPanel">
+                <form asp-controller="Pages" asp-action="Login" method="post">
+                    <input name="Username" class="form-control" />
+                    <input name="Password" class="form-control" />
+                    <button id="loginButton" type="submit">Submit</button>
+                </form>
+            </div>
+        </div>
+
+        <div>
+            <h2 id="toggleRegister">Register:</h2>
+            <div id="registerPanel">
+                <form asp-controller="Pages" asp-action="Register" method="post">
+                    <input name="Username" class="form-control" />
+                    <input name="Password" class="form-control" />
+                    <button id="registerButton" type="submit">Submit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</body>
