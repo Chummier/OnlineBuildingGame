@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using OnlineBuildingGame.Game;
 
 namespace OnlineBuildingGame.Controllers
 {
@@ -18,6 +19,7 @@ namespace OnlineBuildingGame.Controllers
         public IActionResult Main()
         {
             ViewData["World"] = _world.getWorld();
+            ViewData["WorldDim"] = _world.getSize();
             return View();
         }
     }

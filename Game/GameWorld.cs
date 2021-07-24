@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace OnlineBuildingGame
+namespace OnlineBuildingGame.Game
 {
     public struct TileProperties
     {
@@ -31,7 +31,7 @@ namespace OnlineBuildingGame
         private Dictionary<string, TileProperties> TileSet;
 
         private GameTile[][] World;
-        private readonly int dim = 500;
+        private readonly int dim = 25;
 
         public GameWorld()
         {
@@ -40,7 +40,7 @@ namespace OnlineBuildingGame
                 {"Tree", new TileProperties(true, false, false, "tree") },
             };
 
-            World = new GameTile[500][];
+            World = new GameTile[dim][];
             for (int i = 0; i < dim; i++)
             {
                 World[i] = new GameTile[dim];
@@ -53,7 +53,7 @@ namespace OnlineBuildingGame
             {
                 for (int j = 0; j < dim; j++)
                 {
-                    World[i][j].name = TileNames[tileIndex++];
+                    World[i][j].name = TileNames[tileIndex];
                     if (tileIndex < TileNames.Length-1)
                     {
                         tileIndex++;

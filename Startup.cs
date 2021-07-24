@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using OnlineBuildingGame.Data;
+using OnlineBuildingGame.Game;
 
 namespace OnlineBuildingGame
 {
