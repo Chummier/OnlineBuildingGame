@@ -24,11 +24,18 @@ namespace OnlineBuildingGame.Game
 
     public struct GameTile{
         public string name { get; set; }
+        public TileProperties data { get; }
+
+        public GameTile(string Name, TileProperties Data)
+        {
+            name = Name;
+            data = Data;
+        }
     }
 
     public class GameWorld
     {
-        private Dictionary<string, TileProperties> TileSet;
+        private readonly Dictionary<string, TileProperties> TileSet;
 
         private GameTile[][] World;
         private readonly int dim = 25;

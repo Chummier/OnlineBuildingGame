@@ -1,4 +1,5 @@
 ﻿@using OnlineBuildingGame.Game;
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     var dim = ViewData["WorldDim"] as int?;
     var world = ViewData["World"] as GameTile[][];
@@ -9,8 +10,33 @@
         background-color: black;
     }
 
-    .navbar a{
+    .navbar a {
         color: white;
+    }
+
+    body{
+        overflow: hidden;
+    }
+
+    table{
+        max-block-size: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    table tr{
+        overflow: hidden;
+    }
+
+    table td{
+        overflow: hidden;
+    }
+
+    .tile {
+        width: 30px;
+        height: 30px;
+        border: solid;
+        overflow: hidden;
     }
 </style>
 
@@ -19,6 +45,9 @@
         <a>Chat</a>
         <a>Inventory</a>
         <a>Menu</a>
+        <a>
+            <input type="range" min="1" max="10" value="3" id="scaleSlider" />
+        </a>
     </div>
 </header>
 
@@ -26,13 +55,13 @@
 <body>
     <div>
         <table>
-            @for(int i = 0; i < dim; i++)
+            @for (int i = 0; i < dim; i++)
             {
                 <tr>
-                @for(int j = 0; j < dim; j++)
-                {
-                    <td>@world[i][j].name[0]</td>
-                }
+                    @for (int j = 0; j < dim; j++)
+                    {
+                        <td class="tile">@world[i][j].name[0]</td>
+                    }
                 </tr>
             }
         </table>
@@ -40,5 +69,15 @@
 </body>
 
 <footer>
-    
 </footer>
+
+<script>
+    var scaleSlider = document.getElementById("scaleSlider");
+    let tiles = document.getElementsByClassName("tile");
+    scaleSlider.oninput = function () {
+        for (i = 0; i < tiles.length; i++) {
+            tiles[i].style.width = this.value * 10;
+            tiles[i].style.height = this.value * 10;
+        }
+    }
+</script>
