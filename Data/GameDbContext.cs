@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using OnlineBuildingGame.Models;
 
 namespace OnlineBuildingGame.Data
 {
@@ -12,5 +13,8 @@ namespace OnlineBuildingGame.Data
         {
 
         }
+
+        public DbSet<PlayerModel> Players { get; set; }
+        public DbSet<WorldModel> World { get; set; }
     }
 }

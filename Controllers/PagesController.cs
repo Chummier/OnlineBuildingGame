@@ -1,10 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Identity;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
 
 namespace OnlineBuildingGame.Controllers
 {
@@ -28,19 +28,26 @@ namespace OnlineBuildingGame.Controllers
 
         public async Task<IActionResult> Index()
         {
-            return View();
+            if (_signInManager.IsSignedIn(User))
+            {
+                return RedirectToAction("Main", "Game");
+            } else
+            {
+                var users = from u in _userManager.Users.ToList()
+                            select u.UserName;
+                ViewData["Users"] = users.ToList();
+                return View();
+            }
+            
         }
 
         [HttpPost]
         public async Task<IActionResult> Login()
         { 
-            if (ModelState.IsValid)
+            var res = await _signInManager.PasswordSignInAsync(Name, Password, isPersistent: false, lockoutOnFailure: false);
+            if (res.Succeeded)
             {
-                var res = await _signInManager.PasswordSignInAsync(Name, Password, isPersistent: false, lockoutOnFailure: false);
-                if (res.Succeeded)
-                {
-                    return RedirectToRoute("Game/Main");
-                }
+                return RedirectToAction("Main", "Game");
             }
             return RedirectToAction("Index");
         }
@@ -48,16 +55,13 @@ namespace OnlineBuildingGame.Controllers
         [HttpPost]
         public async Task<IActionResult> Register()
         {
-            if (ModelState.IsValid)
+            IdentityUser newUser = new IdentityUser { UserName = Name };
+            var res = await _userManager.CreateAsync(newUser, Password);
+            
+            if (res.Succeeded)
             {
-                IdentityUser newUser = new IdentityUser { UserName = Name };
-                var res = await _userManager.CreateAsync(newUser, Password);
-
-                if (res.Succeeded)
-                {
-                    await _signInManager.SignInAsync(newUser, isPersistent: false);
-                    return RedirectToRoute("Game/Main");
-                }
+                await _signInManager.SignInAsync(newUser, isPersistent: false);
+                return RedirectToAction("Main", "Game");
             }
             return RedirectToAction("Index");
         }

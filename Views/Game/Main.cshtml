@@ -1,83 +1,116 @@
-﻿@using OnlineBuildingGame.Game;
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
-@{
-    var dim = ViewData["WorldDim"] as int?;
-    var world = ViewData["World"] as GameTile[][];
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+@{ 
+    string[] TileImageList = ViewData["TileImageList"] as string[];
+    string[] ItemImageList = ViewData["ItemImageList"] as string[];
+
+    int? inventoryRows = ViewData["InventoryRows"] as int?;
+    int? inventoryCols = ViewData["InventoryCols"] as int?;
 }
 
 <style>
     .navbar {
-        background-color: black;
+        background-color: white;
     }
 
     .navbar a {
-        color: white;
+        color: black;
     }
 
-    body{
-        overflow: hidden;
+    .inventory{
+        position: absolute;
     }
 
-    table{
-        max-block-size: 100%;
-        margin-left: auto;
-        margin-right: auto;
+    .hotbar{
+        position:absolute;
     }
 
-    table tr{
-        overflow: hidden;
-    }
-
-    table td{
-        overflow: hidden;
-    }
-
-    .tile {
-        width: 30px;
-        height: 30px;
+    td{
+        width: 55px;
+        height: 55px;
         border: solid;
-        overflow: hidden;
+    }
+
+    .gameCanvas{
+        position: absolute;
+    }
+
+    .chat {
+        background-color: azure;
+        position: absolute;
+        resize: none;
     }
 </style>
 
 <header>
     <div class="navbar">
-        <a>Chat</a>
-        <a>Inventory</a>
-        <a>Menu</a>
+        <a><input id="ChatButton" type="button" value="Chat"/></a>
+        <a><input id="InventoryButton" type="button" value="Inventory" /></a>
+        <a><input id="MenuButton" type="button" value="Menu" /></a>
         <a>
-            <input type="range" min="1" max="10" value="3" id="scaleSlider" />
+            <input type="range" min="1" max="6" value="3" id="ScaleSlider" />
         </a>
+        <input id="Username" value="@ViewData["UserName"]" hidden disabled />
     </div>
 </header>
 
-
 <body>
     <div>
-        <table>
-            @for (int i = 0; i < dim; i++)
+        <canvas class="gameCanvas" id="game" width="1000" height="800"></canvas>
+        <canvas class="gameCanvas" id="entity" width="1000" height="800"></canvas>
+        <canvas class="gameCanvas" id="player" width="1000" height="800"></canvas>
+        <table class="inventory" id="InventoryTable">
+            @for (int i = 0; i < inventoryRows; i++)
             {
                 <tr>
-                    @for (int j = 0; j < dim; j++)
+                    @for (int j = 0; j < inventoryCols; j++)
                     {
-                        <td class="tile">@world[i][j].name[0]</td>
+                        string id1 = "i" + i + j;
+                        string id2 = "ii" + i + j;
+                        string id3 = "ip" + i + j;
+                        <td id="@id1" onclick="SelectInventory(@i, @j)">
+                            <img id="@id2" />
+                            <p id="@id3"></p>
+                        </td>
                     }
                 </tr>
             }
         </table>
+
+        <table class="hotbar" id="HotbarTable">
+            <tr>
+                @for (int i = 0; i < 5; i++)
+                {
+                    string id1 = "h" + i;
+                    string id2 = "hi" + i;
+                    string id3 = "hp" + i;
+                    <td id="@id1" onclick="SelectHotbarSwap(@i)">
+                        <img id="@id2" />
+                        <p id="@id3"></p>
+                    </td>
+
+                }
+            </tr>
+        </table>
+
+        <input class="chat" id="chatInput" />
+
+        <div id="chat"></div>
+
+
     </div>
 </body>
 
 <footer>
+    @for(int i = 0; i < TileImageList.Length; i++)
+            {
+                <img id="@TileImageList[i]" src="~/images/tiles/@TileImageList[i]" hidden />
+            }
+    @for(int i = 0; i < ItemImageList.Length; i++)
+            {
+                <img id="@ItemImageList[i]" src="~/images/items/@ItemImageList[i]" hidden />
+            }
 </footer>
 
-<script>
-    var scaleSlider = document.getElementById("scaleSlider");
-    let tiles = document.getElementsByClassName("tile");
-    scaleSlider.oninput = function () {
-        for (i = 0; i < tiles.length; i++) {
-            tiles[i].style.width = this.value * 10;
-            tiles[i].style.height = this.value * 10;
-        }
-    }
-</script>
+<script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
+<script src="~/js/game.js"></script>

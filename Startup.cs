@@ -19,6 +19,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using OnlineBuildingGame.Data;
 using OnlineBuildingGame.Game;
+using OnlineBuildingGame.Hubs;
 
 namespace OnlineBuildingGame
 {
@@ -40,6 +41,8 @@ namespace OnlineBuildingGame
                 options.UseSqlServer(Configuration.GetConnectionString("UsersConnection")));
 
             services.AddSingleton<LoginManager>();
+            services.AddSingleton<GameWorld>();
+            services.AddSingleton<GameLogic>();
 
             services.AddDefaultIdentity<IdentityUser>(
                 options => {
@@ -48,11 +51,11 @@ namespace OnlineBuildingGame
                     options.Password.RequireUppercase = false;
                 }).AddEntityFrameworkStores<GameUsersDbContext>();
 
-            services.AddSingleton<GameWorld>();
-            //services.AddHostedService<ChatAppInitializer>();
-
             services.AddControllersWithViews();
-            services.AddSignalR();
+            services.AddSignalR(o =>
+            {
+                o.EnableDetailedErrors = true;
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -62,8 +65,8 @@ namespace OnlineBuildingGame
             {
                 app.UseDeveloperExceptionPage();
             }
-
             app.UseHttpsRedirection();
+            app.UseStaticFiles();
 
             app.UseRouting();
 
@@ -76,7 +79,7 @@ namespace OnlineBuildingGame
                     name: "default",
                     pattern: "{controller=Pages}/{action=Index}/{id?}");
 
-                //endpoints.MapHub<ChatHub>("/chatHub");
+                endpoints.MapHub<GameHub>("/gameHub");
             });
         }
     }
