@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using OnlineBuildingGame.Models;
 using OnlineBuildingGame.Data;
 using OnlineBuildingGame.Hubs;
@@ -14,6 +16,7 @@ namespace OnlineBuildingGame.Game
     public class GameWorld
     {
         private readonly IHubContext<GameHub> _hubContext;
+        private readonly IServiceProvider _serviceProvider;
 
         public readonly Dictionary<string, TileModel> TileSet;
         private Dictionary<int, dynamic> TileDataSet; // <TileId, List of drops to give when tile is broken>
@@ -41,13 +44,16 @@ namespace OnlineBuildingGame.Game
         private readonly int rows = 25, cols = 25;
 
         private static readonly Timer UpdateTimer = new Timer();
-        public int UpdateInterval = 15;
+        private static readonly Timer SaveTimer = new Timer();
+        public readonly int UpdateInterval = 15;
+        public readonly int SaveInterval = 1000;
 
         private int GlobalIdCounter = 0;
 
-        public GameWorld(IHubContext<GameHub> hubContext)
+        public GameWorld(IHubContext<GameHub> hubContext, IServiceProvider serviceProvider)
         {
             _hubContext = hubContext;
+            _serviceProvider = serviceProvider;
 
             TileSet = new Dictionary<string, TileModel>()
             {
@@ -113,6 +119,7 @@ namespace OnlineBuildingGame.Game
                 {ItemSet["FlowerItem"].Id, TileSet["Flower"] },
                 {ItemSet["LogWallItem"].Id, TileSet["LogWall"] },
                 {ItemSet["StoneWallItem"].Id, TileSet["StoneWall"] },
+                {ItemSet["SaplingItem"].Id, TileSet["Sapling"] },
             };
 
             World = new TileModel[Layers][][];
@@ -137,6 +144,10 @@ namespace OnlineBuildingGame.Game
             UpdateTimer.AutoReset = true;
             UpdateTimer.Enabled = true;
 
+            SaveTimer.Interval = SaveInterval;
+            SaveTimer.Elapsed += Save;
+            SaveTimer.AutoReset = true;
+            SaveTimer.Enabled = true;
         }
 
         private void GenerateWorld(int x, int y)
@@ -194,7 +205,28 @@ namespace OnlineBuildingGame.Game
             }
         }
 
-        private async void Update(Object source, ElapsedEventArgs e)
+        private void Save(Object source, ElapsedEventArgs e)
+        {
+            using (var scope = _serviceProvider.CreateScope())
+            {
+                var _db = scope.ServiceProvider.GetService<GameDbContext>();
+
+                _db.World.FromSqlRaw("DELETE FROM World");
+                
+                for (int i = 0; i < Layers; i++)
+                {
+                    var tiles = from x in World[i]
+                                from y in x
+                                select y.Name;
+                    string layer = String.Join(',', tiles);
+                    //_db.World.Add(new WorldLayerModel(0, layer));
+                }
+
+                _db.SaveChanges();
+            }
+        }
+
+        private void Update(Object source, ElapsedEventArgs e)
         {
             CheckPositions();
             CheckMsgLifetimes();

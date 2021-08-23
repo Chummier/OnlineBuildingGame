@@ -9,8 +9,8 @@ using OnlineBuildingGame.Data;
 namespace OnlineBuildingGame.Migrations.GameDb
 {
     [DbContext(typeof(GameDbContext))]
-    [Migration("20210809155355_InitialUpdatedModels")]
-    partial class InitialUpdatedModels
+    [Migration("20210822205153_NewModels")]
+    partial class NewModels
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -19,6 +19,45 @@ namespace OnlineBuildingGame.Migrations.GameDb
                 .HasAnnotation("Relational:MaxIdentifierLength", 128)
                 .HasAnnotation("ProductVersion", "5.0.7")
                 .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+            modelBuilder.Entity("OnlineBuildingGame.Models.EntityLayerModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<string>("Amounts")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Entities")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NormalizedPositions")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Entities");
+                });
+
+            modelBuilder.Entity("OnlineBuildingGame.Models.InventoryModel", b =>
+                {
+                    b.Property<int>("DbId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<string>("Items")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Size")
+                        .HasColumnType("int");
+
+                    b.HasKey("DbId");
+
+                    b.ToTable("InventoryModel");
+                });
 
             modelBuilder.Entity("OnlineBuildingGame.Models.PlayerModel", b =>
                 {
@@ -33,8 +72,8 @@ namespace OnlineBuildingGame.Migrations.GameDb
                     b.Property<int>("Health")
                         .HasColumnType("int");
 
-                    b.Property<string>("InventoryId")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("InventoryId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .HasColumnType("nvarchar(max)");
@@ -50,29 +89,20 @@ namespace OnlineBuildingGame.Migrations.GameDb
                     b.ToTable("Players");
                 });
 
-            modelBuilder.Entity("OnlineBuildingGame.Models.WorldModel", b =>
+            modelBuilder.Entity("OnlineBuildingGame.Models.WorldLayerModel", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<int>("DbId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    b.Property<int>("DimX")
+                    b.Property<int>("Layer")
                         .HasColumnType("int");
 
-                    b.Property<int>("DimY")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Layer0")
+                    b.Property<string>("Tiles")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Layer1")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Layer2")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
+                    b.HasKey("DbId");
 
                     b.ToTable("World");
                 });

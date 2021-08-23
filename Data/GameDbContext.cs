@@ -13,8 +13,10 @@ namespace OnlineBuildingGame.Data
         {
 
         }
-
+        public DbSet<WorldLayerModel> World { get; set; }
+        public DbSet<EntityLayerModel> Entities { get; set; }
         public DbSet<PlayerModel> Players { get; set; }
-        public DbSet<WorldModel> World { get; set; }
+        public DbSet<InventoryModel> Inventories { get; set; }
+        public DbSet<HotbarModel> Hotbars { get; set; }
     }
 }
