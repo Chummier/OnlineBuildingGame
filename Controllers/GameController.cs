@@ -34,7 +34,7 @@ namespace OnlineBuildingGame.Controllers
                 return RedirectToAction("Index", "Pages");
             } else
             {
-                _worldLogic.LoginPlayer(User.Identity.Name);
+                _world.LoginPlayer(User.Identity.Name);
 
                 ViewData["TileImageList"] = _world.GetTileImages();
                 ViewData["ItemImageList"] = _world.GetItemImages();

@@ -13,6 +13,12 @@ namespace OnlineBuildingGame.Models
         public int Layer { get; set; }
         public string Tiles { get; set; }
 
+        public WorldLayerModel()
+        {
+            Layer = 0;
+            Tiles = "";
+        }
+
         public WorldLayerModel(int layer, string tiles)
         {
             Layer = layer;

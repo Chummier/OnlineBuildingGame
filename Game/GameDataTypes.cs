@@ -11,6 +11,7 @@ namespace OnlineBuildingGame.Game
         public const string Nothing = "Nothing";
         public const string Place = "Place";
         public const string PlaceFloor = "PlaceFloor";
+        public const string Plant = "Plant";
         public const string UseTool = "UseTool";
         public const string UseWeapon = "UseWeapon";
     }

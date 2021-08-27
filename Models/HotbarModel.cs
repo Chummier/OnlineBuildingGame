@@ -14,5 +14,12 @@ namespace OnlineBuildingGame.Models
         public int Size { get; set; }
         public string Items { get; set; } // Amt|ItemName, Amt|ItemName
                                         // 0|whatever if empty slot
+
+        public HotbarModel(int id, int size, string items)
+        {
+            Id = id;
+            Size = size;
+            Items = items;
+        }
     }
 }

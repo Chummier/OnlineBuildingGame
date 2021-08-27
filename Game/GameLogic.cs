@@ -32,31 +32,6 @@ namespace OnlineBuildingGame.Game
             updateTimer.Enabled = true;
         }
 
-        public void LoginPlayer(string player)
-        {
-            using (var scope = _serviceProvider.CreateScope())
-            {
-                var _db = scope.ServiceProvider.GetService<GameDbContext>();
-
-                var res = from p in _db.Players.ToList()
-                          where p.Name == player
-                          select p;
-
-                if (res.Count() == 0)
-                {
-                    var id = _world.GetNextId();
-                    PlayerModel p = new PlayerModel(player, id);
-                    _world.AddPlayer(p, true);
-                    _db.Players.Add(p);
-                    _db.SaveChanges();
-                }
-                else
-                {
-                    _world.AddPlayer(res.First(), true);
-                }
-            }
-        }
-
         private async void OnTimedEvent(Object source, ElapsedEventArgs e)
         {
             int layers = _world.getNumLayers();
