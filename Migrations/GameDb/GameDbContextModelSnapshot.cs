@@ -18,67 +18,124 @@ namespace OnlineBuildingGame.Migrations.GameDb
                 .HasAnnotation("ProductVersion", "5.0.7")
                 .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-            modelBuilder.Entity("OnlineBuildingGame.Models.EntityLayerModel", b =>
+            modelBuilder.Entity("OnlineBuildingGame.Models.EntityModel", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    b.Property<string>("Amounts")
+                    b.Property<int>("Amount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Entities")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("PosX")
+                        .HasColumnType("int");
 
-                    b.Property<string>("NormalizedPositions")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("PosY")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.ToTable("Entities");
                 });
 
-            modelBuilder.Entity("OnlineBuildingGame.Models.HotbarModel", b =>
+            modelBuilder.Entity("OnlineBuildingGame.Models.InventoryDataModel", b =>
                 {
-                    b.Property<int>("DbId")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    b.Property<int>("Id")
+                    b.Property<int>("Amount")
                         .HasColumnType("int");
 
-                    b.Property<string>("Items")
+                    b.Property<int>("InvId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ItemName")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("Size")
+                    b.Property<int>("Position")
                         .HasColumnType("int");
 
-                    b.HasKey("DbId");
+                    b.HasKey("Id");
 
-                    b.ToTable("Hotbars");
+                    b.ToTable("InventoryData");
                 });
 
             modelBuilder.Entity("OnlineBuildingGame.Models.InventoryModel", b =>
                 {
-                    b.Property<int>("DbId")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    b.Property<int>("Id")
+                    b.Property<int>("InvId")
                         .HasColumnType("int");
-
-                    b.Property<string>("Items")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Size")
                         .HasColumnType("int");
 
-                    b.HasKey("DbId");
+                    b.HasKey("Id");
 
                     b.ToTable("Inventories");
+                });
+
+            modelBuilder.Entity("OnlineBuildingGame.Models.MapDataModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<int>("Layer")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MapId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PosX")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PosY")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TileId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TileName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("MapData");
+                });
+
+            modelBuilder.Entity("OnlineBuildingGame.Models.MapModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<int>("DimX")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DimY")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MapId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Maps");
                 });
 
             modelBuilder.Entity("OnlineBuildingGame.Models.PlayerModel", b =>
@@ -92,6 +149,9 @@ namespace OnlineBuildingGame.Migrations.GameDb
                         .HasColumnType("int");
 
                     b.Property<int>("Health")
+                        .HasColumnType("int");
+
+                    b.Property<int>("HotbarId")
                         .HasColumnType("int");
 
                     b.Property<int>("InventoryId")
@@ -109,24 +169,6 @@ namespace OnlineBuildingGame.Migrations.GameDb
                     b.HasKey("Id");
 
                     b.ToTable("Players");
-                });
-
-            modelBuilder.Entity("OnlineBuildingGame.Models.WorldLayerModel", b =>
-                {
-                    b.Property<int>("DbId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    b.Property<int>("Layer")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Tiles")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("DbId");
-
-                    b.ToTable("World");
                 });
 #pragma warning restore 612, 618
         }

@@ -43,6 +43,7 @@ namespace OnlineBuildingGame
             services.AddSingleton<LoginManager>();
             services.AddSingleton<GameWorld>();
             services.AddSingleton<GameLogic>();
+            services.AddSingleton<GamePipe>();
 
             services.AddDefaultIdentity<IdentityUser>(
                 options => {

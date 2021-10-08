@@ -63,7 +63,6 @@ function LoadInventory() {
 
     for (let i = 0; i < 5; i++) {
         for (let j = 0; j < 5; j++) {
-
             var td = document.getElementById("i" + i + j);
             var img = document.getElementById("ii" + i + j);
             var p = document.getElementById("ip" + i + j);
@@ -151,7 +150,7 @@ function UseItem(itemName, index, action) {
     ctx.clearRect(0, 0, entityCanvas.width, entityCanvas.height);
 
     var itemX = radiusX * imgSize; 
-    var itemY = radiusY * imgSize; // set x and y to player position
+    var itemY = radiusY * imgSize; // set x and y to player position on game screen
     var worldTargetM = playerY;
     var worldTargetN = playerX;
 
@@ -198,7 +197,7 @@ function DrawWorld(world, numLayers, worldRows, worldCols, centerX, centerY) {
     ctx.font = "15px Arial";
 
     var m = Math.ceil(centerY) - radiusY;
-    var n = Math.ceil(centerX) - radiusX;
+    var n = Math.ceil(centerX) - radiusX; // top left [m][n] of the game world- [3][3] for example
     for (let y = 0; y < gameCanvas.height; y += imgSize) {
         for (let x = 0; x < gameCanvas.width; x += imgSize) {
             if (m < 0 || n < 0) {
@@ -207,6 +206,7 @@ function DrawWorld(world, numLayers, worldRows, worldCols, centerX, centerY) {
             } else if (m >= worldRows || n >= worldCols) {
                 img = document.getElementById("Air.png");
                 ctx.drawImage(img, x, y, imgSize, imgSize);
+
             } else {
                 for (let l = 0; l < numLayers; l++) {
                     img = document.getElementById(world[l][m][n]);
@@ -342,29 +342,35 @@ connection.on("GetDirection", function (dir) {
     playerDirection = dir;
 });
 
-connection.on("GetInventory", function (quantities, items) {
+connection.on("GetInventory", function (quantities, items, positions) {
     var i;
-    for (i = 0; i < quantities.length; i++) {
-        inventoryItemAmounts[i] = quantities[i];
-        inventoryItemNames[i] = items[i];
-    }
-    for (i = i; i < inventoryItemAmounts.length; i++) {
+
+    for (i = 0; i < inventoryItemAmounts.length; i++) {
         inventoryItemAmounts[i] = 0;
-        inventoryItemNames[i] = "BLANK";
+        inventoryItemNames[i] = "BlankItem";
     }
+
+    for (i = 0; i < positions.length; i++) {
+        inventoryItemAmounts[positions[i]] = quantities[i];
+        inventoryItemNames[positions[i]] = items[i];
+    }
+
     LoadInventory();
 });
 
-connection.on("GetHotbar", function (quantities, items) {
+connection.on("GetHotbar", function (quantities, items, positions) {
     var i;
-    for (i = 0; i < quantities.length; i++) {
-        hotbarItemAmounts[i] = quantities[i];
-        hotbarItemNames[i] = items[i];
-    }
-    for (i = i; i < hotbarItemAmounts.length; i++) {
+
+    for (i = 0; i < hotbarItemAmounts.length; i++) {
         hotbarItemAmounts[i] = 0;
-        hotbarItemNames[i] = "BLANK";
+        hotbarItemNames[i] = "BlankItem";
     }
+
+    for (i = 0; i < positions.length; i++) {
+        hotbarItemAmounts[positions[i]] = quantities[i];
+        hotbarItemNames[positions[i]] = items[i];
+    }
+
     LoadHotbar();
 });
 

@@ -20,16 +20,15 @@ namespace OnlineBuildingGame.Game
         private readonly IServiceProvider _serviceProvider;
 
         public readonly Dictionary<string, TileModel> TileSet; // <TileName, TileModel>
-        private Dictionary<int, dynamic> TileDataSet; // <TileId, List of drops to give when tile is broken>
+        private Dictionary<int, List<Item>> TileDataSet; // <TileId, List of drops to give when tile is broken>
         public readonly Dictionary<string, ItemModel> ItemSet; // <ItemName, ItemModel>
-        private Dictionary<int, dynamic> ItemDataSet; // <ItemId, Tile to place when item is used>
+        private Dictionary<int, TileModel> ItemDataSet; // <ItemId, Tile to place when item is used>
         private readonly Dictionary<string, Func<dynamic, bool>> FuncList; // <FuncName, Func<input, output>>
 
-        private Dictionary<int, Inventory> ActiveInventories = new Dictionary<int, Inventory>(); // <InventoryId, Inventory>
-        private Dictionary<int, Inventory> ActiveHotbars = new Dictionary<int, Inventory>(); // <InventoryId, Inventory>
-        private Dictionary<string, PlayerModel> ConnectedPlayers = new Dictionary<string, PlayerModel>(); // <PlayerName, PlayerModel>
+        private Dictionary<int, List<InventoryDataModel>> ActiveInventories = new Dictionary<int, List<InventoryDataModel>>(); // <InventoryId, List<items>>
+        private Dictionary<string, PlayerModel> ConnectedPlayers = new Dictionary<string, PlayerModel>();
 
-        private Dictionary<int, List<EntityModel>> ActiveEntities = new Dictionary<int, List<EntityModel>>(); // <NormalizedPosition, List<EntityModel>>
+        private List<EntityModel> ActiveEntities = new List<EntityModel>();
         private Dictionary<int, (float, string)> ActivePlants = new Dictionary<int, (float, string)>(); // <NormalizedPosition, (time to grow, tile to become when grown)>
 
         private Dictionary<string, ChatMsg> ChatMessages = new Dictionary<string, ChatMsg>(); // <PlayerName, ChatMsg>, only 1 message at a time per player
@@ -41,7 +40,9 @@ namespace OnlineBuildingGame.Game
         public int InventoryCols = 5;
         public int HotbarSize = 5;
 
-        private TileModel[][][] World;
+        private List<MapDataModel> MainMap;
+
+        private int WorldId = 0;
         private readonly int Layers = 3;
 
         private readonly int rows = 25, cols = 25;
@@ -105,21 +106,21 @@ namespace OnlineBuildingGame.Game
                 {FunctionTypes.Plant, (dynamic input) => Plant(input) },
             };
 
-            TileDataSet = new Dictionary<int, dynamic>()
+            TileDataSet = new Dictionary<int, List<Item>>()
             {
-                {TileSet["Tree"].Id, new List<Item>(){new Item(5, ItemSet["LogWallItem"]), new Item(2, ItemSet["SaplingItem"])} },
-                {TileSet["Grass"].Id, new List<Item>(){new Item(1, ItemSet["GrassItem"]) } },
-                {TileSet["Dirt"].Id, new List<Item>(){new Item(1, ItemSet["DirtItem"]) } },
-                {TileSet["Sand"].Id, new List<Item>(){new Item(1, ItemSet["SandItem"]) } },
-                {TileSet["LogWall"].Id, new List<Item>(){new Item(1, ItemSet["LogWallItem"]) } },
-                {TileSet["Stone"].Id, new List<Item>(){new Item(5, ItemSet["StoneWallItem"]) } },
-                {TileSet["StoneWall"].Id, new List<Item>(){new Item(1, ItemSet["StoneWallItem"]) } },
-                {TileSet["Flower"].Id, new List<Item>(){new Item(1, ItemSet["FlowerItem"]) } },
-                {TileSet["Sunflower"].Id, new List<Item>(){new Item(1, ItemSet["SunflowerItem"]) } },
-                {TileSet["Chest"].Id, new List<Item>(){new Item(1, ItemSet["ChestItem"]) } },
+                {TileSet["Tree"].TileId, new List<Item>(){new Item(5, ItemSet["LogWallItem"]), new Item(2, ItemSet["SaplingItem"])} },
+                {TileSet["Grass"].TileId, new List<Item>(){new Item(1, ItemSet["GrassItem"]) } },
+                {TileSet["Dirt"].TileId, new List<Item>(){new Item(1, ItemSet["DirtItem"]) } },
+                {TileSet["Sand"].TileId, new List<Item>(){new Item(1, ItemSet["SandItem"]) } },
+                {TileSet["LogWall"].TileId, new List<Item>(){new Item(1, ItemSet["LogWallItem"]) } },
+                {TileSet["Stone"].TileId, new List<Item>(){new Item(5, ItemSet["StoneWallItem"]) } },
+                {TileSet["StoneWall"].TileId, new List<Item>(){new Item(1, ItemSet["StoneWallItem"]) } },
+                {TileSet["Flower"].TileId, new List<Item>(){new Item(1, ItemSet["FlowerItem"]) } },
+                {TileSet["Sunflower"].TileId, new List<Item>(){new Item(1, ItemSet["SunflowerItem"]) } },
+                {TileSet["Chest"].TileId, new List<Item>(){new Item(1, ItemSet["ChestItem"]) } },
             };
 
-            ItemDataSet = new Dictionary<int, dynamic>()
+            ItemDataSet = new Dictionary<int, TileModel>()
             {
                 {ItemSet["DirtItem"].Id, TileSet["Dirt"]},
                 {ItemSet["GrassItem"].Id, TileSet["Grass"] },
@@ -133,22 +134,10 @@ namespace OnlineBuildingGame.Game
                 {ItemSet["ChestItem"].Id, TileSet["Chest"] },
             };
 
-            World = new TileModel[Layers][][];
-            for (int l = 0; l < Layers; l++)
-            {
-                World[l] = new TileModel[rows][];
-                for (int j = 0; j < rows; j++)
-                {
-                    World[l][j] = new TileModel[cols];
-                    for (int k = 0; k < cols; k++)
-                    {
-                        World[l][j][k] = new TileModel();
-                    }
-                }
-            }
+            MainMap = new List<MapDataModel>();
 
-            //LoadWorldFromFile();
-            LoadWorld();
+            LoadWorldFromFile();
+            //LoadWorld();
 
             UpdateTimer.Interval = UpdateInterval;
             UpdateTimer.Elapsed += Update;
@@ -178,16 +167,9 @@ namespace OnlineBuildingGame.Game
                     for (int j = 0; j < cols; j++)
                     {
                         string[] DataTile = currentLayer[tileIndex].Split('|');
-                        World[l][i][j].Name = DataTile[1];
-                        if (TileSet.TryGetValue(DataTile[1], out TileModel value))
-                        {
-                            World[l][i][j] = value;
-                            World[l][i][j].DataId = int.Parse(DataTile[0]);
-                        }
-                        else
-                        {
-                            World[l][i][j] = TileSet["Grass"];
-                        }
+                        MapDataModel temp = new MapDataModel(WorldId, TileSet[DataTile[1]].TileId, l, DataTile[1], i, j);
+
+                        MainMap.Add(temp);
 
                         if (tileIndex < currentLayer.Length - 1)
                         {
@@ -195,7 +177,7 @@ namespace OnlineBuildingGame.Game
                         }
                     }
                 }
-            }
+            }         
         }
 
         private void LoadWorld()
@@ -203,34 +185,11 @@ namespace OnlineBuildingGame.Game
             using (var scope = _serviceProvider.CreateScope())
             {
                 var _db = scope.ServiceProvider.GetService<GameDbContext>();
-                var layers = from x in _db.World
-                             select x;
-                foreach (WorldLayerModel l in layers)
-                {
-                    string[] current = l.Tiles.Split(',').Where(s => !string.IsNullOrEmpty(s)).Select(s => s.Trim()).ToArray();
-                    int tileIndex = 0;
-                    for (int i = 0; i < rows; i++)
-                    {
-                        for (int j = 0; j < cols; j++)
-                        {
-                            World[l.Layer][i][j].Name = current[tileIndex];
-                            if (TileSet.TryGetValue(current[tileIndex], out TileModel value))
-                            {
-                                World[l.Layer][i][j] = value;
-                                World[l.Layer][i][j].DataId = 0;
-                            }
-                            else
-                            {
-                                World[l.Layer][i][j] = TileSet["Grass"];
-                            }
 
-                            if (tileIndex < current.Length - 1)
-                            {
-                                tileIndex++;
-                            }
-                        }
-                    }
-                }
+                var map = _db.MapData.Where(d => d.MapId == WorldId).OrderBy(t => t.Layer).ThenBy(t => t.PosY).ThenBy(t => t.PosX);
+                MainMap.AddRange(map);
+
+                ActiveEntities.AddRange(_db.Entities);
             }
         }
 
@@ -239,87 +198,37 @@ namespace OnlineBuildingGame.Game
             using (var scope = _serviceProvider.CreateScope())
             {
                 var _db = scope.ServiceProvider.GetService<GameDbContext>();
+                string query;
 
-                _db.Database.ExecuteSqlRaw("DELETE FROM World");
-                for (int i = 0; i < Layers; i++)
+                // Save Maps
+                query = "DELETE FROM dbo.Maps WHERE MapId = " + WorldId;
+                _db.Database.ExecuteSqlRaw(query);
+                _db.Maps.Add(new MapModel(WorldId, "Main", rows, cols));
+
+                var map = _db.MapData.Where(d => d.MapId == WorldId).OrderBy(t => t.Layer).ThenBy(t => t.PosY).ThenBy(t => t.PosX).ToList();
+                for (int i = 0; i < map.Count; i++)
                 {
-                    var tiles = from x in World[i]
-                                from y in x
-                                select y.Name;
-                    string layer = String.Join(',', tiles);
-                    _db.World.Add(new WorldLayerModel(i, layer));
+                    map[i].TileId = MainMap[i].TileId;
+                    map[i].TileName = MainMap[i].TileName;
                 }
+                _db.MapData.UpdateRange(map);
 
-                _db.Database.ExecuteSqlRaw("DELETE FROM Entities");
-                if (ActiveEntities.Count > 0)
-                {
-                    var entityNames = from x in ActiveEntities.Values
-                                      from y in x
-                                      select y.ItemName;
-                    var entityPosNorm = from x in ActiveEntities.Values
-                                        from y in x
-                                        select (y.PosY * cols + y.PosX);
-                    var entityAmts = from x in ActiveEntities.Values
-                                     from y in x
-                                     select y.Amount;
-                    string names = String.Join(',', entityNames);
-                    string normPos = String.Join(',', entityPosNorm);
-                    string amts = String.Join(',', entityAmts);
-                    _db.Entities.Add(new EntityLayerModel(names, normPos, amts));
-                }
+                // Save Entities
+                _db.Database.ExecuteSqlRaw("DELETE FROM dbo.Entities");
+                _db.Entities.AddRange(ActiveEntities);
 
+                // Save Player Data
                 _db.Players.UpdateRange(ConnectedPlayers.Values);
 
-                foreach (Inventory i in ActiveInventories.Values)
+                // Save Player Inventory/Hotbar Data
+                foreach (int key in ActiveInventories.Keys)
                 {
-                    int id = ActiveInventories.FirstOrDefault(x => x.Value == i).Key;
-                    List<Item> inv = i.Items;
-                    var amts = from x in inv
-                               select x.Count;
-                    var names = from x in inv
-                                select x.Data.Name;
-                    string[] temp = new string[amts.Count()];
-                    for (int j = 0; j < amts.Count(); j++)
+                    query = "DELETE FROM dbo.InventoryData WHERE InvId = " + key;
+                    _db.Database.ExecuteSqlRaw(query);
+                    foreach (InventoryDataModel m in ActiveInventories[key])
                     {
-                        temp[j] = amts.ToArray()[j] + "|" + names.ToArray()[j];
+                        _db.InventoryData.Add(new InventoryDataModel(m.InvId, m.ItemName, m.Amount, m.Position));
                     }
-                    string items = String.Join(',', temp);
-                    InventoryModel current = new InventoryModel(id, InventorySize, items);
-
-                    var dbInv = from x in _db.Inventories
-                                where x.Id == id
-                                select x;
-                    if (dbInv.Count() > 0)
-                    {
-                        _db.Inventories.Remove(dbInv.First());
-                    }
-                    _db.Inventories.Add(current);
-                }
-
-                foreach (Inventory i in ActiveHotbars.Values)
-                {
-                    int id = ActiveHotbars.FirstOrDefault(x => x.Value == i).Key;
-                    List<Item> hotbar = i.Items;
-                    var amts = from x in hotbar
-                               select x.Count;
-                    var names = from x in hotbar
-                                select x.Data.Name;
-                    string[] temp = new string[amts.Count()];
-                    for (int j = 0; j < amts.Count(); j++)
-                    {
-                        temp[j] = amts.ToArray()[j] + "|" + names.ToArray()[j];
-                    }
-                    string items = String.Join(',', temp);
-                    HotbarModel current = new HotbarModel(id, HotbarSize, items);
-
-                    var dbHotbar = from x in _db.Hotbars
-                                   where x.Id == id
-                                   select x;
-                    if (dbHotbar.Count() > 0)
-                    {
-                        _db.Hotbars.Remove(dbHotbar.First());
-                    }
-                    _db.Hotbars.Add(current);
                 }
 
                 _db.SaveChanges();
@@ -333,6 +242,28 @@ namespace OnlineBuildingGame.Game
             CheckPlants();
         }
 
+        private int NextFreeIndex(List<int> indices, int end)
+        {
+            int start = indices.Min();
+            int candidate = start + 1;
+
+            foreach (int i in indices)
+            {
+                if (i == candidate)
+                {
+                    candidate = i + 1;
+                }
+            }
+
+            if (candidate >= end)
+            {
+                return -1;
+            } else
+            {
+                return candidate;
+            }
+        }
+
         private bool ValidPosition(int PosX, int PosY)
         {
             if (PosX >= 0 && PosY >= 0)
@@ -341,7 +272,9 @@ namespace OnlineBuildingGame.Game
                 {
                     for (int l = 0; l < Layers; l++)
                     {
-                        if (World[l][PosY][PosX].Type != TileTypes.Open)
+                        string tile = MainMap.Where(t => t.PosY == PosY && t.PosX == PosX)
+                                              .Where(t => t.Layer == l).First().TileName;
+                        if (TileSet[tile].Type != TileTypes.Open)
                         {
                             return false;
                         }
@@ -357,17 +290,16 @@ namespace OnlineBuildingGame.Game
         {
             foreach (PlayerModel p in ConnectedPlayers.Values)
             {
-                int normPos = p.PosY * cols + p.PosX;
-                if (ActiveEntities.TryGetValue(normPos, out List<EntityModel> val))
+                var entities = ActiveEntities.Where(e => e.PosY == p.PosY && e.PosX == p.PosX);
+                List<Item> items = new List<Item>();
+
+                foreach (EntityModel e in entities)
                 {
-                    List<Item> items = new List<Item>();
-                    for (int i = 0; i < val.Count; i++)
-                    {
-                        items.Add(new Item(1, ItemSet[val[i].ItemName]));
-                    }
-                    GiveItems(p.Name, items);
-                    ActiveEntities.Remove(normPos);
+                    items.Add(new Item(e.Amount, ItemSet[e.Name]));
                 }
+
+                GiveItems(p.Name, items);
+                ActiveEntities.RemoveAll(e => entities.Contains(e));
             }
         }
 
@@ -395,7 +327,7 @@ namespace OnlineBuildingGame.Game
                     int n = key % cols;
                     if (TileSet.TryGetValue(ActivePlants[key].Item2, out TileModel val))
                     {
-                        World[1][m][n] = val;
+                        //World[1][m][n] = val;
                     }
                     ActivePlants.Remove(key);
                 } else
@@ -417,17 +349,11 @@ namespace OnlineBuildingGame.Game
 
         public (string[], int[], int[]) getEntities()
         {
-            var entities = ActiveEntities.Values;
-
-
-            var res1 = from x in entities
-                       from e in x
-                       select e.ItemName;
-           var res2 = from x in entities
-                      from e in x
-                      select e.PosY;
-            var res3 = from x in entities
-                       from e in x
+            var res1 = from e in ActiveEntities
+                       select e.Name;
+            var res2 = from e in ActiveEntities
+                       select e.PosY;
+            var res3 = from e in ActiveEntities
                        select e.PosX;
             return (res1.ToArray(), res2.ToArray(), res3.ToArray());
         }
@@ -455,17 +381,11 @@ namespace OnlineBuildingGame.Game
                 }
             }
 
-            // Tiles
-            for (int l = 0; l < Layers; l++)
+            foreach (MapDataModel d in MainMap.ToArray())
             {
-                for (int i = 0; i < rows; i++)
-                {
-                    for (int j = 0; j < cols; j++)
-                    {
-                        res[l][i][j] = World[l][i][j].Img;
-                    }
-                }
+                res[d.Layer][d.PosY][d.PosX] = TileSet[d.TileName].Img;
             }
+
             return res;
         }
 
@@ -486,7 +406,7 @@ namespace OnlineBuildingGame.Game
         public void LoginPlayer(string player)
         {
             // If already connected
-            if (ConnectedPlayers.TryGetValue(player, out PlayerModel val))
+            if (ConnectedPlayers.ContainsKey(player))
             {
                 return;
             }
@@ -495,55 +415,68 @@ namespace OnlineBuildingGame.Game
             {
                 var _db = scope.ServiceProvider.GetService<GameDbContext>();
 
-                var res = from p in _db.Players.ToList()
+                var res = from p in _db.Players
                           where p.Name == player
                           select p;
 
                 // If is a new player
                 if (res.Count() == 0)
                 {
-                    var id = GetId(player, DateTime.Now.ToString());
-                    PlayerModel p = new PlayerModel(player, id);
+                    var invIds = _db.Players.OrderBy(p => p.InventoryId).Select(p => p.InventoryId);
+                    var hotbarIds = _db.Players.OrderBy(p => p.HotbarId).Select(p => p.HotbarId);
 
-                    InitializeInventory(id);
-                    InitializeHotbar(id);
+                    int invId, hotbarId;
+                    if (_db.Players.Count() == 0)
+                    {
+                        invId = 0;
+                        hotbarId = 1;
+                    } else
+                    {
+                        invId = invIds.LastOrDefault() + 2;
+                        hotbarId = hotbarIds.LastOrDefault() + 2;
+                    }
+
+                    PlayerModel p = new PlayerModel(player, invId, hotbarId);
+
+                    ActiveInventories.Add(invId, new List<InventoryDataModel>());
+                    ActiveInventories.Add(hotbarId, new List<InventoryDataModel>());
 
                     _db.Players.Add(p);
+
+                    _db.Inventories.Add(new InventoryModel(invId, InventorySize));
+                    _db.Inventories.Add(new InventoryModel(hotbarId, HotbarSize));
                     _db.SaveChanges();
 
                     ConnectedPlayers.Add(player, p);
                 }
                 else
                 {
-                    var inv = from i in _db.Inventories
-                              where i.Id == res.First().InventoryId
-                              select i;
-                    var hotbar = from h in _db.Hotbars
-                                 where h.Id == res.First().InventoryId
-                                 select h;
+                    int invId = res.First().InventoryId;
+                    int hotbarId = res.First().HotbarId;
 
-                    string[] items = inv.First().Items.Split(',').Where(s => !string.IsNullOrEmpty(s)).Select(s => s.Trim()).ToArray();
-                    ActiveInventories.Add(inv.First().Id, new Inventory());
-                    for (int i = 0; i < items.Length; i++)
+                    var inv = _db.InventoryData.Where(i => i.InvId == invId);
+                    var hotbar = _db.InventoryData.Where(h => h.InvId == hotbarId);
+
+                    ActiveInventories.Add(invId, new List<InventoryDataModel>());
+                    ActiveInventories.Add(hotbarId, new List<InventoryDataModel>());
+
+                    foreach (InventoryDataModel d in inv)
                     {
-                        string[] amtName = items[i].Split('|').ToArray();
-                        ActiveInventories[inv.First().Id].Items.Add(new Item(Int32.Parse(amtName[0]), ItemSet[amtName[1]]));
+                        ActiveInventories[invId].Add(new InventoryDataModel(d.InvId, d.ItemName, d.Amount, d.Position));                        
                     }
 
-                    items = hotbar.First().Items.Split(',').Where(s => !string.IsNullOrEmpty(s)).Select(s => s.Trim()).ToArray();
-                    ActiveHotbars.Add(hotbar.First().Id, new Inventory());
-                    for (int i = 0; i < items.Length; i++)
+                    foreach (InventoryDataModel d in hotbar)
                     {
-                        string[] amtName = items[i].Split('|').ToArray();
-                        ActiveHotbars[hotbar.First().Id].Items.Add(new Item(Int32.Parse(amtName[0]), ItemSet[amtName[1]]));
+                        ActiveInventories[hotbarId].Add(new InventoryDataModel(d.InvId, d.ItemName, d.Amount, d.Position));
                     }
 
-                    ConnectedPlayers.Add(res.First().Name, res.First());
+                    ConnectedPlayers.Add(player, res.First());
                 }
 
                 //GiveItems(player, new List<Item>() { new Item(5, ItemSet["SunflowerItem"]) });
                 //GiveItems(player, new List<Item>() { new Item(5, ItemSet["ChestItem"]) });
-                GiveItems(player, new List<Item>() { new Item(1, ItemSet["GlovesItem"]) });
+                //GiveItems(player, new List<Item>() { new Item(1, ItemSet["GlovesItem"]), new Item(1, ItemSet["AxeItem"]), new Item(1, ItemSet["ShovelItem"])});
+                //GiveItems(player, new List<Item>() { new Item(1, ItemSet["PickaxeItem"]), new Item(1, ItemSet["SwordItem"]) });
             }
         }
 
@@ -554,26 +487,20 @@ namespace OnlineBuildingGame.Game
 
         public void AddEntity(string itemName, int posY, int posX)
         {
-            int normPos = posY * cols + posX;
-            if (ActiveEntities.TryGetValue(normPos, out List<EntityModel> val))
-            {
-                val.Add(new EntityModel(itemName, 1, posX, posY));
-            } else
-            {
-                ActiveEntities.Add(normPos, new List<EntityModel>() {new EntityModel(itemName, 1, posX, posY)});
-            }
+            ActiveEntities.Add(new EntityModel(itemName, posY, posX, 1));
         }
 
         public void SwapItems(string player, string typeA, string typeB, int indexA, int indexB)
         {
-            Inventory invA;
-            Inventory invB;
+            int idA, idB;
+            PlayerModel p = ConnectedPlayers[player];
+
             if (typeA == InventoryTypes.Inventory)
             {
-                invA = ActiveInventories[ConnectedPlayers[player].InventoryId];
+                idA = p.InventoryId;
             } else if (typeA == InventoryTypes.Hotbar)
             {
-                invA = ActiveHotbars[ConnectedPlayers[player].InventoryId];
+                idA = p.HotbarId;
             } else
             {
                 return;
@@ -581,49 +508,52 @@ namespace OnlineBuildingGame.Game
 
             if (typeB == InventoryTypes.Inventory)
             {
-                invB = ActiveInventories[ConnectedPlayers[player].InventoryId];
+                idB = p.InventoryId;
             } else if (typeB == InventoryTypes.Hotbar)
             {
-                invB = ActiveHotbars[ConnectedPlayers[player].InventoryId];
+                idB = p.HotbarId;
             } else
             {
                 return;
             }
 
-            Item temp = invA.Items[indexA];
-            invA.Items[indexA] = invB.Items[indexB];
-            invB.Items[indexB] = temp;
-        }
+            InventoryDataModel itemA = ActiveInventories[idA].Where(i => i.Position == indexA).FirstOrDefault();
+            InventoryDataModel itemB = ActiveInventories[idB].Where(i => i.Position == indexB).FirstOrDefault();
+            int iA = ActiveInventories[idA].IndexOf(itemA);
+            int iB = ActiveInventories[idB].IndexOf(itemB);
 
-        public void InitializeInventory(int inventoryId)
-        {
-            ActiveInventories.Add(inventoryId, new Inventory());
-            for (int i = ActiveInventories[inventoryId].Items.Count; i < InventorySize; i++)
+            if (iA == -1 & iB == -1)
             {
-                ActiveInventories[inventoryId].Items.Add(new Item(1, ItemSet["BlankItem"]));
+                return;
             }
-        }
 
-        public void InitializeHotbar(int inventoryId)
-        {
-            ActiveHotbars.Add(inventoryId, new Inventory(new Item(1, ItemSet["ShovelItem"]), new Item(1, ItemSet["AxeItem"]),
-                new Item(1, ItemSet["SwordItem"]), new Item(17, ItemSet["FlowerItem"]), new Item(1, ItemSet["PickaxeItem"])));
-            for (int i = ActiveHotbars[inventoryId].Items.Count; i < HotbarSize; i++)
+            if (iA == -1)
             {
-                ActiveHotbars[inventoryId].Items.Add(new Item(1, ItemSet["BlankItem"]));
+                ActiveInventories[idB].Remove(itemB);
+                ActiveInventories[idA].Add(new InventoryDataModel(idA, itemB.ItemName, itemB.Amount, indexA));
+            } else if (iB == -1)
+            {
+                ActiveInventories[idA].Remove(itemA);
+                ActiveInventories[idB].Add(new InventoryDataModel(idB, itemA.ItemName, itemA.Amount, indexB));
+            } else
+            {
+                ActiveInventories[idA][iA] = new InventoryDataModel(idA, itemB.ItemName, itemB.Amount, itemA.Position);
+                ActiveInventories[idB][iB] = new InventoryDataModel(idB, itemA.ItemName, itemA.Amount, itemB.Position);
             }
         }
 
         public void GiveItems(string player, List<Item> items)
         {
-            var id = ConnectedPlayers[player].InventoryId;
-            var inventory = ActiveInventories[id];
-            var hotbar = ActiveHotbars[id];
+            int invId = ConnectedPlayers[player].InventoryId;
+            int hotbarId = ConnectedPlayers[player].HotbarId;
 
             foreach (var x in items)
             {
-                int invIndex = inventory.Items.FindIndex(i => i.Data.Id == x.Data.Id);
-                int htbIndex = hotbar.Items.FindIndex(i => i.Data.Id == x.Data.Id);
+                var inventory = ActiveInventories[invId];
+                var hotbar = ActiveInventories[hotbarId];
+
+                int invIndex = ActiveInventories[invId].FindIndex(i => i.ItemName == x.Data.Name);
+                int htbIndex = ActiveInventories[hotbarId].FindIndex(i => i.ItemName == x.Data.Name);
 
                 int newIndex;
 
@@ -633,28 +563,44 @@ namespace OnlineBuildingGame.Game
                     // And not in hotbar
                     if (htbIndex == -1)
                     {
-                        newIndex = inventory.Items.FindIndex(i => i.Data.Id == ItemSet["BlankItem"].Id);
+                        if (inventory.Count == 0)
+                        {
+                            newIndex = 0;
+                        } else
+                        {
+                            newIndex = NextFreeIndex(inventory.Select(i => i.Position).ToList(), InventorySize);
+                        }
+                        
                         // Then if there's space in the inventory
                         if (newIndex != -1)
                         {
-                            inventory.Items[newIndex] = x;
+                            inventory.Add(new InventoryDataModel(invId, x.Data.Name, x.Count, newIndex));
                             // Else if there's space in the hotbar
                         } else
                         {
-                            newIndex = hotbar.Items.FindIndex(i => i.Data.Id == ItemSet["BlankItem"].Id);
+                            if (hotbar.Count == 0)
+                            {
+                                newIndex = 0;
+                            } else
+                            {
+                                newIndex = NextFreeIndex(hotbar.Select(i => i.Position).ToList(), HotbarSize);
+                            }
+                            
                             if (newIndex != -1)
                             {
-                                hotbar.Items[newIndex] = x;
+                                hotbar.Add(new InventoryDataModel(hotbarId, x.Data.Name, x.Count, newIndex));
                             }
                         }
                     } else
                     {
-                        hotbar.Items[htbIndex] = new Item(hotbar.Items[htbIndex].Count + x.Count, x.Data);
+                        int pos = hotbar[htbIndex].Position;
+                        hotbar[htbIndex] = new InventoryDataModel(hotbarId, x.Data.Name, hotbar[htbIndex].Amount + x.Count, pos);
                     }
                     // Else if in inventory
                 } else
                 {
-                    inventory.Items[invIndex] = new Item(inventory.Items[invIndex].Count + x.Count, x.Data);
+                    int pos = inventory[invIndex].Position;
+                    inventory[invIndex] = new InventoryDataModel(invId, x.Data.Name, inventory[invIndex].Amount + x.Count, pos);
                 }
                 
             }
@@ -662,14 +608,7 @@ namespace OnlineBuildingGame.Game
 
         public (int X, int Y) GetPosition(string player)
         {
-            if (ConnectedPlayers.TryGetValue(player, out PlayerModel val))
-            {
-                return (val.PosX, val.PosY);
-            }
-            else
-            {
-                return (0, 0);
-            }
+            return (ConnectedPlayers[player].PosX, ConnectedPlayers[player].PosY);
         }
 
         public string GetDirection(string player)
@@ -746,16 +685,80 @@ namespace OnlineBuildingGame.Game
             }
         }
 
-        public Item[] GetInventory(string player)
+        public InventoryDataModel[] GetInventory(string player)
         {
             int id = ConnectedPlayers[player].InventoryId;
-            return ActiveInventories[id].Items.ToArray();
+            return ActiveInventories[id].ToArray();
         }
 
-        public Item[] GetHotbar(string player)
+        public InventoryDataModel[] GetHotbar(string player)
         {
-            int id = ConnectedPlayers[player].InventoryId;
-            return ActiveHotbars[id].Items.ToArray();
+            int id = ConnectedPlayers[player].HotbarId;
+            return ActiveInventories[id].ToArray();
+        }
+
+        public void SubtractItem(string player, string item, int hotbarIndex)
+        {
+            var playerHotbar = ActiveInventories[ConnectedPlayers[player].HotbarId];
+            var itemModel = playerHotbar.Where(i => i.Position == hotbarIndex).First();
+            int itemIndex = playerHotbar.IndexOf(itemModel);
+
+            if (itemIndex == -1)
+            {
+                return;
+            }
+
+            int newCount = itemModel.Amount - 1;
+            if (newCount <= 0)
+            {
+                playerHotbar[itemIndex] = new InventoryDataModel(0, "BlankItem", 1, hotbarIndex);
+            }
+            else
+            {
+                playerHotbar[itemIndex] = new InventoryDataModel(itemModel.Id, itemModel.ItemName, newCount, hotbarIndex);
+            }
+        }
+
+        public bool CanPlaceHere(int targetM, int targetN, int layer, bool isDrop)
+        {
+            if (targetM < 0 || targetM >= rows)
+            {
+                return false;
+            }
+            if (targetN < 0 || targetN >= cols)
+            {
+                return false;
+            }
+
+            if (isDrop)
+            {
+                return true;
+            }
+
+            var targetTiles = MainMap.Where(t => t.PosY == targetM && t.PosX == targetN);
+            var target = targetTiles.Where(t => t.Layer == layer).FirstOrDefault();
+
+            if (target == null)
+            {
+                return false;
+            }
+
+            foreach (MapDataModel d in targetTiles)
+            {
+                if (d.Layer > layer)
+                {
+                    if (d.TileId != TileSet["Air"].TileId)
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        public void AlterTile(int targetM, int targetN, int layer, TileModel newTile)
+        {
+
         }
 
         public void UseItem(string action, string player, string item, int hotbarIndex, int targetM, int targetN)
@@ -765,27 +768,11 @@ namespace OnlineBuildingGame.Game
                 var res = FuncList[ItemSet[item].UseFunc]((player, item, hotbarIndex, targetM, targetN));
             } else if (action == "Drop")
             {
-                if (targetM < 0 || targetM >= rows)
+                if (CanPlaceHere(targetM, targetN, 0, true))
                 {
-                    return;
-                }
-                if (targetN < 0 || targetN >= cols)
-                {
-                    return;
-                }
-
-                AddEntity(item, targetM, targetN);
-                Inventory playerHotbar = ActiveHotbars[ConnectedPlayers[player].InventoryId];
-
-                int newCount = playerHotbar.Items[hotbarIndex].Count - 1;
-                if (newCount <= 0)
-                {
-                    playerHotbar.Items[hotbarIndex] = new Item(1, ItemSet["BlankItem"]);
-                }
-                else
-                {
-                    playerHotbar.Items[hotbarIndex] = new Item(newCount, playerHotbar.Items[hotbarIndex].Data);
-                }
+                    AddEntity(item, targetM, targetN);
+                    SubtractItem(player, item, hotbarIndex);
+                } 
             }
         }
 
@@ -804,42 +791,30 @@ namespace OnlineBuildingGame.Game
                 int targetM = input.Item4;
                 int targetN = input.Item5;
 
-                if (targetM < 0 || targetM >= rows)
+                if (!CanPlaceHere(targetM, targetN, 1, false))
+                {
+                    return false;
+                }    
+
+                var target = MainMap.Where(t => t.PosY == targetM && t.PosX == targetN).Where(t => t.Layer == 1).First();
+                int targetIndex = MainMap.IndexOf(target);
+
+                if (target == null)
                 {
                     return false;
                 }
-                if (targetN < 0 || targetN >= cols)
-                {
-                    return false;
-                }
 
-                TileModel targetTile = World[0][targetM][targetN];
-                Inventory playerHotbar = ActiveHotbars[ConnectedPlayers[player].InventoryId];
+                TileModel tile = TileSet[target.TileName];
 
-                for (int l = 1; l < Layers; l++)
+                if (tile.Type == TileTypes.Open)
                 {
-                    if (World[l][targetM][targetN].Id != TileSet["Air"].Id)
+                    if (tile.SubType != TileSubTypes.Air && tile.SubType != TileSubTypes.Water)
                     {
-                        return false;
-                    }
-                }
-
-                if (targetTile.Type == TileTypes.Open)
-                {
-                    if (targetTile.SubType != TileSubTypes.Air && targetTile.SubType != TileSubTypes.Water)
-                    {
-                         if (ItemDataSet.TryGetValue(ItemSet[item].Id, out dynamic val))
+                         if (ItemDataSet.TryGetValue(ItemSet[item].Id, out TileModel val))
                         {
-                            World[1][targetM][targetN] = val;
-                            int newCount = playerHotbar.Items[hotbarIndex].Count - 1;
-                            if (newCount <= 0)
-                            {
-                                playerHotbar.Items[hotbarIndex] = new Item(1, ItemSet["BlankItem"]);
-                            }
-                            else
-                            {
-                                playerHotbar.Items[hotbarIndex] = new Item(newCount, playerHotbar.Items[hotbarIndex].Data);
-                            }
+                            MainMap[targetIndex] = new MapDataModel(WorldId, val.TileId, target.Layer, val.Name, target.PosY, target.PosX);
+
+                            SubtractItem(player, item, hotbarIndex);
                             return true;
                         }
                     }
@@ -858,61 +833,42 @@ namespace OnlineBuildingGame.Game
                 int targetM = input.Item4;
                 int targetN = input.Item5;
 
-                if (targetM < 0 || targetM >= rows)
-                {
-                    return false;
-                }
-                if (targetN < 0 || targetN >= cols)
+                if (!CanPlaceHere(targetM, targetN, 0, false))
                 {
                     return false;
                 }
 
-                TileModel targetTile = World[0][targetM][targetN];
-                Inventory playerHotbar = ActiveHotbars[ConnectedPlayers[player].InventoryId];
+                var target = MainMap.Where(t => t.PosY == targetM && t.PosX == targetN).Where(t => t.Layer == 0).First();
+                int targetIndex = MainMap.IndexOf(target);
 
-                for (int l = 1; l < Layers; l++)
+                if (target == null)
                 {
-                    if (World[l][targetM][targetN].Id != TileSet["Air"].Id)
-                    {
-                        return false;
-                    }
+                    return false;
                 }
 
-                if (targetTile.Id == TileSet["StoneFloor"].Id)
+                TileModel tile = TileSet[target.TileName];
+
+                if (tile.TileId == TileSet["StoneFloor"].TileId)
                 {
                     if (ItemSet[item].Id == ItemSet["DirtItem"].Id)
                     {
-                        if (ItemDataSet.TryGetValue(ItemSet[item].Id, out dynamic val))
+                        if (ItemDataSet.TryGetValue(ItemSet[item].Id, out TileModel val))
                         {
-                            World[0][targetM][targetN] = val;
-                            int newCount = playerHotbar.Items[hotbarIndex].Count - 1;
-                            if (newCount <= 0)
-                            {
-                                playerHotbar.Items[hotbarIndex] = new Item(1, ItemSet["BlankItem"]);
-                            } else
-                            {
-                                playerHotbar.Items[hotbarIndex] = new Item(newCount, playerHotbar.Items[hotbarIndex].Data);
-                            }
-                            
+                            MainMap[targetIndex] = new MapDataModel(WorldId, val.TileId, target.Layer, val.Name, target.PosY, target.PosX);
+
+                            SubtractItem(player, item, hotbarIndex);
                             return true;
                         }
                     }
                 }
 
-                if (targetTile.Id == TileSet["Dirt"].Id)
+                if (target.TileId == TileSet["Dirt"].TileId)
                 {
-                    if (ItemDataSet.TryGetValue(ItemSet[item].Id, out dynamic val))
+                    if (ItemDataSet.TryGetValue(ItemSet[item].Id, out TileModel val))
                     {
-                        World[0][targetM][targetN] = val;
-                        int newCount = playerHotbar.Items[hotbarIndex].Count - 1;
-                        if (newCount <= 0)
-                        {
-                            playerHotbar.Items[hotbarIndex] = new Item(1, ItemSet["BlankItem"]);
-                        }
-                        else
-                        {
-                            playerHotbar.Items[hotbarIndex] = new Item(newCount, playerHotbar.Items[hotbarIndex].Data);
-                        }
+                        MainMap[targetIndex] = new MapDataModel(WorldId, val.TileId, target.Layer, val.Name, target.PosY, target.PosX);
+
+                        SubtractItem(player, item, hotbarIndex);
                         return true;
                     }
                 }
@@ -930,42 +886,30 @@ namespace OnlineBuildingGame.Game
                 int targetM = input.Item4;
                 int targetN = input.Item5;
 
-                if (targetM < 0 || targetM >= rows)
-                {
-                    return false;
-                }
-                if (targetN < 0 || targetN >= cols)
+                if (!CanPlaceHere(targetM, targetN, 0, false))
                 {
                     return false;
                 }
 
-                TileModel targetTile = World[0][targetM][targetN];
-                Inventory playerHotbar = ActiveHotbars[ConnectedPlayers[player].InventoryId];
+                var target = MainMap.Where(t => t.PosY == targetM && t.PosX == targetN).Where(t => t.Layer == 0).First();
+                int targetIndex = MainMap.IndexOf(target);
 
-                for (int l = 1; l < Layers; l++)
+                if (target == null)
                 {
-                    if (World[l][targetM][targetN].Id != TileSet["Air"].Id)
-                    {
-                        return false;
-                    }
+                    return false;
                 }
 
-                if (targetTile.Type == TileTypes.Open)
+                TileModel tile = TileSet[target.TileName];
+
+                if (tile.Type == TileTypes.Open)
                 {
-                    if (targetTile.SubType == TileSubTypes.Soil)
+                    if (tile.SubType == TileSubTypes.Soil)
                     {
-                        if (ItemDataSet.TryGetValue(ItemSet[item].Id, out dynamic val))
+                        if (ItemDataSet.TryGetValue(ItemSet[item].Id, out TileModel val))
                         {
-                            World[1][targetM][targetN] = val;
-                            int newCount = playerHotbar.Items[hotbarIndex].Count - 1;
-                            if (newCount <= 0)
-                            {
-                                playerHotbar.Items[hotbarIndex] = new Item(1, ItemSet["BlankItem"]);
-                            }
-                            else
-                            {
-                                playerHotbar.Items[hotbarIndex] = new Item(newCount, playerHotbar.Items[hotbarIndex].Data);
-                            }
+                            MainMap[targetIndex] = new MapDataModel(WorldId, val.TileId, target.Layer, val.Name, target.PosY, target.PosX);
+
+                            SubtractItem(player, item, hotbarIndex);
 
                             if (item == "FlowerItem")
                             {
@@ -1001,52 +945,43 @@ namespace OnlineBuildingGame.Game
                     return false;
                 }
 
+                var targetTiles = MainMap.Where(t => t.PosY == targetM && t.PosX == targetN);
+
                 if (item == "AxeItem")
                 {
-                    for (int l = Layers - 1; l > 0; l--)
-                    {
-                        TileModel targetTile = World[l][targetM][targetN];
-                        if (targetTile.SubType == TileSubTypes.Wood)
-                        {
-                            World[l][targetM][targetN] = TileSet["Air"];
+                    var targetTile = targetTiles.Where(t => t.Layer == 1).First();
+                    int tileIndex = MainMap.IndexOf(targetTile);
 
-                            if (TileDataSet.TryGetValue(targetTile.Id, out dynamic val))
-                            {
-                                GiveItems(player, val);
-                            }
-                            return true;
-                        }
-                    }
-                } else if (item == "ShovelItem")
-                {
-                    for (int l = 1; l < Layers; l++)
-                    {
-                        if (World[l][targetM][targetN].Id != TileSet["Air"].Id)
-                        {
-                            return false;
-                        }
-                    }
+                    TileModel tile = TileSet[targetTile.TileName];
 
-                    TileModel targetTile = World[0][targetM][targetN];
-                    if (targetTile.SubType == TileSubTypes.Soil)
+                    if (tile.SubType == TileSubTypes.Wood)
                     {
-                        if (targetTile.Id == TileSet["Dirt"].Id)
-                        {
-                            World[0][targetM][targetN] = TileSet["StoneFloor"];
-                        }
-                        else
-                        {
-                            World[0][targetM][targetN] = TileSet["Dirt"];
-                        }
+                        MainMap[tileIndex] = new MapDataModel(WorldId, TileSet["Air"].TileId, 1, TileSet["Air"].Name, targetM, targetN);
 
-                        if (TileDataSet.TryGetValue(targetTile.Id, out dynamic val))
+                        if (TileDataSet.TryGetValue(tile.TileId, out List<Item> val))
                         {
                             GiveItems(player, val);
                         }
                         return true;
-                    } else if (targetTile.SubType == TileSubTypes.Loose)
+                    }
+                } else if (item == "ShovelItem")
+                {
+                    var targetTile = targetTiles.Where(t => t.Layer == 0).First();
+                    int tileIndex = MainMap.IndexOf(targetTile);
+
+                    TileModel tile = TileSet[targetTile.TileName];
+
+                    if (tile.SubType == TileSubTypes.Soil)
                     {
-                        if (TileDataSet.TryGetValue(targetTile.Id, out dynamic val))
+                        if (tile.TileId == TileSet["Dirt"].TileId)
+                        {
+                            MainMap[tileIndex] = new MapDataModel(WorldId, TileSet["StoneFloor"].TileId, 0, TileSet["StoneFloor"].Name, targetM, targetN);
+                        } else
+                        {
+                            MainMap[tileIndex] = new MapDataModel(WorldId, TileSet["Dirt"].TileId, 0, TileSet["Dirt"].Name, targetM, targetN);
+                        }
+
+                        if (TileDataSet.TryGetValue(tile.TileId, out List<Item> val))
                         {
                             GiveItems(player, val);
                         }
@@ -1054,35 +989,37 @@ namespace OnlineBuildingGame.Game
                     }
                 } else if (item == "PickaxeItem")
                 {
-                    for (int l = Layers - 1; l > 0; l--)
-                    {
-                        TileModel targetTile = World[l][targetM][targetN];
-                        if (targetTile.Type == TileTypes.Sturdy && targetTile.SubType == TileSubTypes.Stone)
-                        {
-                            World[l][targetM][targetN] = TileSet["Air"];
+                    var targetTile = targetTiles.Where(t => t.Layer == 1).First();
+                    int tileIndex = MainMap.IndexOf(targetTile);
 
-                            if (TileDataSet.TryGetValue(targetTile.Id, out dynamic val))
-                            {
-                                GiveItems(player, val);
-                            }
-                            return true;
+                    TileModel tile = TileSet[targetTile.TileName];
+
+                    if (tile.Type == TileTypes.Sturdy && tile.SubType == TileSubTypes.Stone)
+                    {
+                        MainMap[tileIndex] = new MapDataModel(WorldId, TileSet["Air"].TileId, 1, TileSet["Air"].Name, targetM, targetN);
+
+                        if (TileDataSet.TryGetValue(tile.TileId, out List<Item> val))
+                        {
+                            GiveItems(player, val);
                         }
+                        return true;
                     }
                 } else if (item == "GlovesItem")
                 {
-                    for (int l = Layers-1; l > 0; l--)
-                    {
-                        TileModel targetTile = World[l][targetM][targetN];
-                        if (targetTile.SubType == TileSubTypes.Loose)
-                        {
-                            World[l][targetM][targetN] = TileSet["Air"];
+                    var targetTile = targetTiles.Where(t => t.Layer == 1).First();
+                    int tileIndex = MainMap.IndexOf(targetTile);
 
-                            if (TileDataSet.TryGetValue(targetTile.Id, out dynamic val))
-                            {
-                                GiveItems(player, val);
-                            }
-                            return true;
+                    TileModel tile = TileSet[targetTile.TileName];
+
+                    if (tile.SubType == TileSubTypes.Loose)
+                    {
+                        MainMap[tileIndex] = new MapDataModel(WorldId, TileSet["Air"].TileId, 1, TileSet["Air"].Name, targetM, targetN);
+
+                        if (TileDataSet.TryGetValue(tile.TileId, out List<Item> val))
+                        {
+                            GiveItems(player, val);
                         }
+                        return true;
                     }
                 }
             }
@@ -1138,11 +1075,6 @@ namespace OnlineBuildingGame.Game
                 }
             }
             return false;
-        }
-
-        public int GetId(string param1, string param2)
-        {
-            return param1.GetHashCode() + param2.GetHashCode();
         }
     }
 }

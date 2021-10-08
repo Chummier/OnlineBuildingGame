@@ -9,9 +9,7 @@ namespace OnlineBuildingGame.Models
 {
     public class TileModel
     {
-        [Key]
-        public int DbId { get; set; }
-        public int Id { get; set; }
+        public int TileId { get; set; }
         public string Name { get; set; }
         public string Type { get; set; }
         public string SubType { get; set; }
@@ -21,7 +19,7 @@ namespace OnlineBuildingGame.Models
 
         public TileModel()
         {
-            Id = 0;
+            TileId = 0;
             Name = "";
             Type = TileTypes.Open;
             SubType = TileSubTypes.Soil;
@@ -30,9 +28,9 @@ namespace OnlineBuildingGame.Models
             DataId = 0;
         }
 
-        public TileModel(int id, string _name, string type, string subType, string enterFunc, string srcimg, int dataId)
+        public TileModel(int tileId, string _name, string type, string subType, string enterFunc, string srcimg, int dataId)
         {
-            Id = id;
+            TileId = tileId;
             Name = _name;
             Type = type;
             SubType = subType;

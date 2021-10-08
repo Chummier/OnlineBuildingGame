@@ -6,21 +6,21 @@ using System.ComponentModel.DataAnnotations;
 
 namespace OnlineBuildingGame.Models
 {
-    public class EntityModel
+    public class MapModel
     {
         [Key]
         public int Id { get; set; }
+        public int MapId { get; set; }
         public string Name { get; set; }
-        public int PosY { get; set; }
-        public int PosX { get; set; }
-        public int Amount { get; set; }
+        public int DimY { get; set; }
+        public int DimX { get; set; }
 
-        public EntityModel(string name, int posY, int posX, int amount)
+        public MapModel(int mapId, string name, int dimY, int dimX)
         {
+            MapId = mapId;
             Name = name;
-            PosY = posY;
-            PosX = posX;
-            Amount = amount;
+            DimY = dimY;
+            DimX = dimX;
         }
     }
 }

@@ -1,13 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Timers;
+using System.IO;
+using System.IO.Pipes;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.DependencyInjection;
 using OnlineBuildingGame.Models;
-using OnlineBuildingGame.Data;
 using OnlineBuildingGame.Hubs;
 
 namespace OnlineBuildingGame.Game
@@ -30,6 +28,10 @@ namespace OnlineBuildingGame.Game
             updateTimer.Elapsed += OnTimedEvent;
             updateTimer.AutoReset = true;
             updateTimer.Enabled = true;
+
+            var namedPipeServer = new NamedPipeServerStream("C#Pipe", PipeDirection.InOut, 1, PipeTransmissionMode.Byte);
+            var streamReader = new StreamReader(namedPipeServer);
+            
         }
 
         private async void OnTimedEvent(Object source, ElapsedEventArgs e)
@@ -57,16 +59,20 @@ namespace OnlineBuildingGame.Game
                 var hotbar = _world.GetHotbar(p.Name);
 
                 var amounts = from i in inventory
-                              select i.Count;
+                              select i.Amount;
                 var items = from i in inventory
-                            select i.Data.Name;
-                await _hubContext.Clients.Group(p.Name).SendAsync("GetInventory", amounts.ToArray(), items.ToArray());
+                            select i.ItemName;
+                var positions = from i in inventory
+                                select i.Position;
+                await _hubContext.Clients.Group(p.Name).SendAsync("GetInventory", amounts.ToArray(), items.ToArray(), positions.ToArray());
 
                 amounts = from i in hotbar
-                          select i.Count;
+                          select i.Amount;
                 items = from i in hotbar
-                        select i.Data.Name;
-                await _hubContext.Clients.Group(p.Name).SendAsync("GetHotbar", amounts.ToArray(), items.ToArray());
+                        select i.ItemName;
+                positions = from i in hotbar
+                            select i.Position;
+                await _hubContext.Clients.Group(p.Name).SendAsync("GetHotbar", amounts.ToArray(), items.ToArray(), positions.ToArray());
             }            
         }
     }

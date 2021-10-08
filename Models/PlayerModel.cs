@@ -25,7 +25,8 @@ namespace OnlineBuildingGame.Models
         public int PosY { get; set; }
         public Direction Facing { get; set; }
         public int Health { get; set; }
-        public int InventoryId { get; set; } // used for hotbar as well
+        public int InventoryId { get; set; }
+        public int HotbarId { get; set; }
 
         public PlayerModel()
         {
@@ -35,9 +36,10 @@ namespace OnlineBuildingGame.Models
             Facing = Direction.South;
             Health = 100;
             InventoryId = 0;
+            HotbarId = 0;
         }
 
-        public PlayerModel(string name, int inventoryId)
+        public PlayerModel(string name, int inventoryId, int hotbarId)
         {
             Name = name;
             PosX = 0;
@@ -45,6 +47,7 @@ namespace OnlineBuildingGame.Models
             Facing = Direction.South;
             Health = 100;
             InventoryId = inventoryId;
+            HotbarId = hotbarId;
         }
     }
 }
