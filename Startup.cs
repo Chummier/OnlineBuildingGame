@@ -1,22 +1,10 @@
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Identity.Web;
-using Microsoft.OpenApi.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using OnlineBuildingGame.Data;
 using OnlineBuildingGame.Game;
 using OnlineBuildingGame.Hubs;
@@ -56,6 +44,7 @@ namespace OnlineBuildingGame
             services.AddSignalR(o =>
             {
                 o.EnableDetailedErrors = true;
+                o.MaximumReceiveMessageSize = 102400000;
             });
         }
 
@@ -80,7 +69,10 @@ namespace OnlineBuildingGame
                     name: "default",
                     pattern: "{controller=Pages}/{action=Index}/{id?}");
 
-                endpoints.MapHub<GameHub>("/gameHub");
+                endpoints.MapHub<GameHub>("/gameHub", configureOptions =>
+                {
+
+                });
             });
         }
     }

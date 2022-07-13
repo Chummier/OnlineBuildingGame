@@ -3,36 +3,41 @@ using System.IO;
 using System.Timers;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Hosting;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using OnlineBuildingGame.Models;
 using OnlineBuildingGame.Data;
-using OnlineBuildingGame.Hubs;
 
 namespace OnlineBuildingGame.Game
 {
     public class GameWorld
     {
-        private readonly IHubContext<GameHub> _hubContext;
         private readonly IServiceProvider _serviceProvider;
 
-        public readonly Dictionary<string, TileModel> TileSet; // <TileName, TileModel>
+        private readonly Dictionary<string, TileModel> TileSet; // <TileName, TileModel>
+        private readonly Dictionary<string, ItemModel> ItemSet; // <ItemName, ItemModel>
         private Dictionary<int, List<Item>> TileDataSet; // <TileId, List of drops to give when tile is broken>
-        public readonly Dictionary<string, ItemModel> ItemSet; // <ItemName, ItemModel>
         private Dictionary<int, TileModel> ItemDataSet; // <ItemId, Tile to place when item is used>
-        private readonly Dictionary<string, Func<dynamic, bool>> FuncList; // <FuncName, Func<input, output>>
 
-        private Dictionary<int, List<InventoryDataModel>> ActiveInventories = new Dictionary<int, List<InventoryDataModel>>(); // <InventoryId, List<items>>
-        private Dictionary<string, PlayerModel> ConnectedPlayers = new Dictionary<string, PlayerModel>();
+        public Dictionary<int, List<InventoryDataModel>> ActiveInventories = new Dictionary<int, List<InventoryDataModel>>(); // <InventoryId, List<items>>
 
-        private List<EntityModel> ActiveEntities = new List<EntityModel>();
-        private Dictionary<int, (float, string)> ActivePlants = new Dictionary<int, (float, string)>(); // <NormalizedPosition, (time to grow, tile to become when grown)>
+        public Dictionary<string, PlayerModel> ConnectedPlayers = new Dictionary<string, PlayerModel>();
+        public Dictionary<int, Dictionary<string, PlayerLocationModel>> WorldsWithPlayers = new Dictionary<int, Dictionary<string, PlayerLocationModel>>(); 
+
+        private Dictionary<string, DateTime> PlayersLastMoved = new Dictionary<string, DateTime>();
+
+        public List<EntityModel> ActiveEntities = new List<EntityModel>();
+        public Dictionary<int, (float, string)> ActivePlants = new Dictionary<int, (float, string)>(); // <NormalizedPosition, (time to grow, tile to become when grown)>
 
         private Dictionary<string, ChatMsg> ChatMessages = new Dictionary<string, ChatMsg>(); // <PlayerName, ChatMsg>, only 1 message at a time per player
         private double msgLifetime = 3;
+
+        public List<CanvasData> ActiveCanvases = new List<CanvasData>();
+        public Dictionary<string, TileInUse> TilesInUse = new Dictionary<string, TileInUse>();
+
+        public readonly Dictionary<string, Func<dynamic, bool>> OnEnterFuncList; // <FuncName, Func<input, output>>
+
+        public MapsDictionary Maps = new MapsDictionary();
 
         public int MaxStackSize = 30;
         public int InventorySize = 25;
@@ -40,9 +45,7 @@ namespace OnlineBuildingGame.Game
         public int InventoryCols = 5;
         public int HotbarSize = 5;
 
-        private List<MapDataModel> MainMap;
-
-        private int WorldId = 0;
+        public int WorldId = 0;
         private readonly int Layers = 3;
 
         private readonly int rows = 25, cols = 25;
@@ -52,9 +55,8 @@ namespace OnlineBuildingGame.Game
         public readonly int UpdateInterval = 15;
         public readonly int SaveInterval = 5000;
 
-        public GameWorld(IHubContext<GameHub> hubContext, IServiceProvider serviceProvider)
+        public GameWorld(IServiceProvider serviceProvider)
         {
-            _hubContext = hubContext;
             _serviceProvider = serviceProvider;
 
             TileSet = new Dictionary<string, TileModel>()
@@ -74,6 +76,17 @@ namespace OnlineBuildingGame.Game
                 {"Sapling", new TileModel(12, "Sapling", TileTypes.Open, TileSubTypes.Loose, FunctionTypes.Nothing, "Sapling.png", 0) },
                 {"Sunflower", new TileModel(13, "Sunflower", TileTypes.Open, TileSubTypes.Loose, FunctionTypes.Nothing, "Sunflower.png", 0) },
                 {"Chest", new TileModel(14, "Chest", TileTypes.Sturdy, TileSubTypes.Wood, FunctionTypes.Nothing, "Chest.png", 0) },
+                {"CanvasTopLeft", new TileModel(15, "CanvasTopLeft", TileTypes.Sturdy, TileSubTypes.Canvas, FunctionTypes.Nothing, "CanvasTopLeft.png", 0) },
+                {"CanvasTopMiddle", new TileModel(16, "CanvasTopMiddle", TileTypes.Sturdy, TileSubTypes.Canvas, FunctionTypes.Nothing, "CanvasTopMiddle.png", 0) },
+                {"CanvasTopRight", new TileModel(17, "CanvasTopRight", TileTypes.Sturdy, TileSubTypes.Canvas, FunctionTypes.Nothing, "CanvasTopRight.png", 0) },
+                {"CanvasMiddleLeft", new TileModel(18, "CanvasMiddleLeft", TileTypes.Sturdy, TileSubTypes.Canvas, FunctionTypes.Nothing, "CanvasMiddleLeft.png", 0) },
+                {"CanvasMiddle", new TileModel(19, "CanvasMiddle", TileTypes.Sturdy, TileSubTypes.Canvas, FunctionTypes.Nothing, "CanvasMiddle.png", 0) },
+                {"CanvasMiddleRight", new TileModel(20, "CanvasMiddleRight", TileTypes.Sturdy, TileSubTypes.Canvas, FunctionTypes.Nothing, "CanvasMiddleRight.png", 0) },
+                {"CanvasSingle", new TileModel(21, "CanvasSingle", TileTypes.Sturdy, TileSubTypes.Canvas, FunctionTypes.Nothing, "CanvasSingle.png", 0) },
+                {"CanvasSingleMiddle", new TileModel(22, "CanvasSingleMiddle", TileTypes.Sturdy, TileSubTypes.Canvas, FunctionTypes.Nothing, "CanvasSingleMiddle.png", 0) },
+                {"PlankDoor", new TileModel(23, "PlankDoor", TileTypes.Open, TileSubTypes.Gateway, FunctionTypes.Nothing, "PlankDoor.png", 0) },
+                {"Stairs", new TileModel(24, "Stairs", TileTypes.Open, TileSubTypes.Gateway, FunctionTypes.GoUpstairs, "Stairs.png", 0) },
+                {"StairsDown", new TileModel(25, "StairsDown", TileTypes.Open, TileSubTypes.Gateway, FunctionTypes.GoDownstairs, "StairsDown.png", 0) },
             };
 
             ItemSet = new Dictionary<string, ItemModel>()
@@ -94,16 +107,10 @@ namespace OnlineBuildingGame.Game
                 {"SunflowerItem", new ItemModel(13, "SunflowerItem", FunctionTypes.Plant, "SunflowerItem.png") },
                 {"ChestItem", new ItemModel(14, "ChestItem", FunctionTypes.Place, "ChestItem.png") },
                 {"GlovesItem", new ItemModel(15, "GlovesItem", FunctionTypes.UseTool, "GlovesItem.png") },
-            };
-
-            FuncList = new Dictionary<string, Func<dynamic, bool>>()
-            {
-                {FunctionTypes.Nothing, (dynamic input) => Nothing() },
-                {FunctionTypes.Place, (dynamic input) => Place(input) },
-                {FunctionTypes.PlaceFloor, (dynamic input) => PlaceFloor(input) },
-                {FunctionTypes.UseTool, (dynamic input) => UseTool(input) },
-                {FunctionTypes.UseWeapon, (dynamic input) => UseWeapon(input) },
-                {FunctionTypes.Plant, (dynamic input) => Plant(input) },
+                {"CanvasItem", new ItemModel(16, "CanvasItem", FunctionTypes.UseCanvas, "CanvasItem.png") },
+                {"PlankDoorItem", new ItemModel(17, "PlankDoorItem", FunctionTypes.PlaceGateway, "PlankDoorItem.png") },
+                {"StairsItem", new ItemModel(18, "StairsItem", FunctionTypes.PlaceGateway, "StairsItem.png") },
+                {"StairsDownItem", new ItemModel(19, "StairsDownItem", FunctionTypes.PlaceGateway, "StairsDownItem.png") },
             };
 
             TileDataSet = new Dictionary<int, List<Item>>()
@@ -118,6 +125,9 @@ namespace OnlineBuildingGame.Game
                 {TileSet["Flower"].TileId, new List<Item>(){new Item(1, ItemSet["FlowerItem"]) } },
                 {TileSet["Sunflower"].TileId, new List<Item>(){new Item(1, ItemSet["SunflowerItem"]) } },
                 {TileSet["Chest"].TileId, new List<Item>(){new Item(1, ItemSet["ChestItem"]) } },
+                {TileSet["PlankDoor"].TileId, new List<Item>(){new Item(1, ItemSet["PlankDoorItem"])} },
+                {TileSet["Stairs"].TileId, new List<Item>(){new Item(1, ItemSet["StairsItem"]) } },
+                {TileSet["StairsDown"].TileId, new List<Item>(){new Item(1, ItemSet["StairsDownItem"]) } },
             };
 
             ItemDataSet = new Dictionary<int, TileModel>()
@@ -132,12 +142,16 @@ namespace OnlineBuildingGame.Game
                 {ItemSet["SaplingItem"].Id, TileSet["Sapling"] },
                 {ItemSet["SunflowerItem"].Id, TileSet["Sunflower"] },
                 {ItemSet["ChestItem"].Id, TileSet["Chest"] },
+                {ItemSet["PlankDoorItem"].Id, TileSet["PlankDoor"] },
+                {ItemSet["StairsItem"].Id, TileSet["Stairs"] },
+                {ItemSet["StairsDownItem"].Id, TileSet["StairsDown"] },
             };
 
-            MainMap = new List<MapDataModel>();
-
-            LoadWorldFromFile();
-            //LoadWorld();
+            OnEnterFuncList = new Dictionary<string, Func<dynamic, bool>>()
+            {
+                {FunctionTypes.GoUpstairs, (dynamic input) => GoUpstairs(input) },
+                {FunctionTypes.GoDownstairs, (dynamic input) => GoDownstairs(input) },
+            };
 
             UpdateTimer.Interval = UpdateInterval;
             UpdateTimer.Elapsed += Update;
@@ -148,16 +162,15 @@ namespace OnlineBuildingGame.Game
             SaveTimer.Elapsed += Save;
             SaveTimer.AutoReset = true;
             SaveTimer.Enabled = true;
+
+            LoadWorldFromFile();
+            //LoadWorld();
         }
 
-        private void GenerateWorld(int x, int y)
-        {
-
-        }
-
-        private void LoadWorldFromFile()
+        private void GenerateWorld(int id, string owner, string name)
         {
             string[] layers = File.ReadAllLines("Game\\WorldLayers.txt");
+            List<MapDataModel> Map = new List<MapDataModel>();
             for (int l = 0; l < Layers; l++)
             {
                 string[] currentLayer = layers[l].Split(',').Where(s => !string.IsNullOrEmpty(s)).Select(s => s.Trim()).ToArray();
@@ -167,7 +180,35 @@ namespace OnlineBuildingGame.Game
                     for (int j = 0; j < cols; j++)
                     {
                         string[] DataTile = currentLayer[tileIndex].Split('|');
-                        MapDataModel temp = new MapDataModel(WorldId, TileSet[DataTile[1]].TileId, l, DataTile[1], i, j);
+                        MapDataModel temp = new MapDataModel(id, TileSet[DataTile[1]].TileId, DataTile[1], j, i, 1);
+
+                        Map.Add(temp);
+
+                        if (tileIndex < currentLayer.Length - 1)
+                        {
+                            tileIndex++;
+                        }
+                    }
+                }
+            }
+            MapModel mapModel = new MapModel(id, owner, name, rows, cols, 3, 0, 0, 1);
+            Maps.AddMap(id, Map);
+        }
+
+        private void LoadWorldFromFile()
+        {
+            string[] layers = File.ReadAllLines("Game\\WorldLayers.txt");
+            List<MapDataModel> MainMap = new List<MapDataModel>();
+            for (int l = 0; l < Layers; l++)
+            {
+                string[] currentLayer = layers[l].Split(',').Where(s => !string.IsNullOrEmpty(s)).Select(s => s.Trim()).ToArray();
+                int tileIndex = 0;
+                for (int i = 0; i < rows; i++)
+                {
+                    for (int j = 0; j < cols; j++)
+                    {
+                        string[] DataTile = currentLayer[tileIndex].Split('|');
+                        MapDataModel temp = new MapDataModel(WorldId, TileSet[DataTile[1]].TileId, DataTile[1], j, i, l);
 
                         MainMap.Add(temp);
 
@@ -177,17 +218,24 @@ namespace OnlineBuildingGame.Game
                         }
                     }
                 }
-            }         
+            }
+            Maps.AddMap(WorldId, MainMap);
         }
 
         private void LoadWorld()
         {
             using (var scope = _serviceProvider.CreateScope())
             {
+                List<MapDataModel> MainMap = new List<MapDataModel>();
                 var _db = scope.ServiceProvider.GetService<GameDbContext>();
 
                 var map = _db.MapData.Where(d => d.MapId == WorldId).OrderBy(t => t.Layer).ThenBy(t => t.PosY).ThenBy(t => t.PosX);
                 MainMap.AddRange(map);
+
+                foreach (var d in _db.MapData)
+                {
+                    //Maps.Add(new Tuple<int, int, int>(d.PosX, d.PosY, d.Layer), d);
+                }
 
                 ActiveEntities.AddRange(_db.Entities);
             }
@@ -203,13 +251,16 @@ namespace OnlineBuildingGame.Game
                 // Save Maps
                 query = "DELETE FROM dbo.Maps WHERE MapId = " + WorldId;
                 _db.Database.ExecuteSqlRaw(query);
-                _db.Maps.Add(new MapModel(WorldId, "Main", rows, cols));
+                _db.Maps.Add(new MapModel(WorldId, "Admin", "Main", rows, cols, 3, 0, 0, 1));
 
                 var map = _db.MapData.Where(d => d.MapId == WorldId).OrderBy(t => t.Layer).ThenBy(t => t.PosY).ThenBy(t => t.PosX).ToList();
+                var MainMap = Maps.ToList(WorldId);
                 for (int i = 0; i < map.Count; i++)
                 {
                     map[i].TileId = MainMap[i].TileId;
                     map[i].TileName = MainMap[i].TileName;
+
+                    //map[i] = Maps.Access(WorldId, map[i].PosX, map[i].PosY, map[i].Layer);
                 }
                 _db.MapData.UpdateRange(map);
 
@@ -219,6 +270,7 @@ namespace OnlineBuildingGame.Game
 
                 // Save Player Data
                 _db.Players.UpdateRange(ConnectedPlayers.Values);
+
 
                 // Save Player Inventory/Hotbar Data
                 foreach (int key in ActiveInventories.Keys)
@@ -232,6 +284,36 @@ namespace OnlineBuildingGame.Game
                 }
 
                 _db.SaveChanges();
+            }
+        }
+
+        public Dictionary<string, TileModel> GetTileSet()
+        {
+            return TileSet;
+        }
+
+        public Dictionary<string, ItemModel> GetItemSet()
+        {
+            return ItemSet;
+        }
+
+        public Dictionary<int, List<Item>> GetTileDataSet()
+        {
+            return TileDataSet;
+        }
+
+        public Dictionary<int, TileModel> GetItemDataSet()
+        {
+            return ItemDataSet;
+        }
+
+        public string[] GetPlayerWorldNames(string player)
+        {
+            using (var scope = _serviceProvider.CreateScope())
+            {
+                var _db = scope.ServiceProvider.GetService<GameDbContext>();
+                string[] worldNames = _db.Maps.Where(d => d.Owner == player).OrderBy(d => d.MapId).Select(d => d.Name).ToArray();
+                return worldNames;
             }
         }
 
@@ -264,17 +346,17 @@ namespace OnlineBuildingGame.Game
             }
         }
 
-        private bool ValidPosition(int PosX, int PosY)
+        private bool ValidPosition(int PosX, int PosY, int Layer)
         {
             if (PosX >= 0 && PosY >= 0)
             {
                 if (PosX < cols && PosY < rows)
                 {
-                    for (int l = 0; l < Layers; l++)
+                    string tile = Maps.Access(WorldId, PosX, PosY, Layer).TileName;
+
+                    if (TileSet.TryGetValue(tile, out TileModel val))
                     {
-                        string tile = MainMap.Where(t => t.PosY == PosY && t.PosX == PosX)
-                                              .Where(t => t.Layer == l).First().TileName;
-                        if (TileSet[tile].Type != TileTypes.Open)
+                        if (val.Type != TileTypes.Open)
                         {
                             return false;
                         }
@@ -282,24 +364,100 @@ namespace OnlineBuildingGame.Game
                     return true;
                 }
             }
+            return false;
+        }
 
+        private bool GoUpstairs(dynamic input)
+        {
+            if (input is (int, string))
+            {
+                int mapId = input.Item1;
+                string player = input.Item2;
+
+                if (WorldsWithPlayers.TryGetValue(mapId, out Dictionary<string, PlayerLocationModel> players))
+                {
+                    if (players.TryGetValue(player, out PlayerLocationModel pData))
+                    {
+                        MoveLayer(mapId, player, pData.Layer + 1);
+                        SetPlayerLocation(mapId, player, (int)pData.PosX, (int)pData.PosY - 1);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private bool GoDownstairs(dynamic input)
+        {
+            if (input is (int, string))
+            {
+                int mapId = input.Item1;
+                string player = input.Item2;
+
+                if (WorldsWithPlayers.TryGetValue(mapId, out Dictionary<string, PlayerLocationModel> players))
+                {
+                    if (players.TryGetValue(player, out PlayerLocationModel pData))
+                    {
+                        MoveLayer(mapId, player, pData.Layer - 1);
+                        SetPlayerLocation(mapId, player, (int)pData.PosX, (int)pData.PosY + 1);
+                        return true;
+                    }
+                }
+            }
             return false;
         }
 
         private void CheckPositions()
         {
-            foreach (PlayerModel p in ConnectedPlayers.Values)
+            foreach (int mapId in WorldsWithPlayers.Keys)
             {
-                var entities = ActiveEntities.Where(e => e.PosY == p.PosY && e.PosX == p.PosX);
-                List<Item> items = new List<Item>();
-
-                foreach (EntityModel e in entities)
+                foreach (string player in WorldsWithPlayers[mapId].Keys)
                 {
-                    items.Add(new Item(e.Amount, ItemSet[e.Name]));
-                }
+                    PlayerLocationModel playerLocation = WorldsWithPlayers[mapId][player];
 
-                GiveItems(p.Name, items);
-                ActiveEntities.RemoveAll(e => entities.Contains(e));
+                    var entities = ActiveEntities.Where(e => e.PosX == playerLocation.PosX && e.PosY == playerLocation.PosY);
+                    List<Item> items = new List<Item>();
+
+                    foreach (EntityModel e in entities)
+                    {
+                        items.Add(new Item(e.Amount, ItemSet[e.Name]));
+                    }
+
+                    GiveItems(playerLocation.Player, items);
+                    ActiveEntities.RemoveAll(e => entities.Contains(e));
+
+                    if (Maps.TryAccess(mapId, (int)playerLocation.PosX, (int)playerLocation.PosY, playerLocation.Layer, out MapDataModel currentTile))
+                    {
+                        if (currentTile.TileId == TileSet["Stairs"].TileId)
+                        {
+                            var res = OnEnterFuncList[TileSet["Stairs"].OnEnterFunc]((mapId, player));
+                        }
+
+                        if (currentTile.TileId == TileSet["StairsDown"].TileId)
+                        {
+                            var res = OnEnterFuncList[TileSet["StairsDown"].OnEnterFunc]((mapId, player));
+                        }
+                    }
+
+                    if (!ValidPosition((int)playerLocation.PosX, (int)playerLocation.PosY, playerLocation.Layer) ||
+                    !ValidPosition((int)Math.Ceiling(playerLocation.PosX), (int)Math.Ceiling(playerLocation.PosY), playerLocation.Layer) ||
+                    !ValidPosition((int)playerLocation.PosX, (int)Math.Ceiling(playerLocation.PosY), playerLocation.Layer) ||
+                    !ValidPosition((int)Math.Ceiling(playerLocation.PosX), (int)playerLocation.PosY, playerLocation.Layer))
+                    {
+                        for (int y = (int)playerLocation.PosY - 1; y <= (int)playerLocation.PosY + 1; y++)
+                        {
+                            for (int x = (int)playerLocation.PosX - 1; x <= (int)playerLocation.PosX + 1; x++)
+                            {
+                                if (ValidPosition(x, y, playerLocation.Layer))
+                                {
+                                    WorldsWithPlayers[mapId][player].PosX = x;
+                                    WorldsWithPlayers[mapId][player].PosY = y;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -347,6 +505,73 @@ namespace OnlineBuildingGame.Game
             return Layers;
         }
 
+        public (string, dynamic) getTileInUse(string player)
+        {
+            string type = "None";
+            dynamic data = null;
+            if (TilesInUse.TryGetValue(player, out TileInUse val))
+            {
+                type = val.Type;
+                if (val.Type == "Canvas")
+                {
+                    data = null;
+                }
+            }
+            return (type, data);
+        }
+
+        public void removeTileInUse(string player)
+        {
+            TilesInUse.Remove(player);
+        }
+        public (int[], int[], int[], int[], string[]) getCanvases()
+        {
+            var res1 = from c in ActiveCanvases
+                       where c.Placed == true
+                       select c.Pos1.Item1;
+            var res2 = from c in ActiveCanvases
+                       where c.Placed == true
+                       select c.Pos1.Item2;
+            var res3 = from c in ActiveCanvases
+                       where c.Placed == true
+                       select c.Pos2.Item1;
+            var res4 = from c in ActiveCanvases
+                       where c.Placed == true
+                       select c.Pos2.Item2;
+            var res5 = from c in ActiveCanvases
+                       where c.Placed == true
+                       select c.Image;
+            return (res1.ToArray(), res2.ToArray(), res3.ToArray(), res4.ToArray(), res5.ToArray());
+        }
+
+        public void updateCanvasImage(string player, string image, int targetM, int targetN)
+        {
+            var canvas = ActiveCanvases.Where(c => targetM >= c.Pos1.Item1 && targetM <= c.Pos2.Item1)
+                    .Where(c => targetN >= c.Pos1.Item2 && targetN <= c.Pos2.Item2).FirstOrDefault();
+            int canvasIndex = ActiveCanvases.IndexOf(canvas);
+
+            if (canvasIndex < 0)
+            {
+                return;
+            }
+
+            string path = @"C:\Users\jrs99_000\source\repos\OnlineBuildingGame\wwwroot\images\canvases\";
+            string fileName = ActiveCanvases[canvasIndex].Pos1.Item1.ToString() + "-" + ActiveCanvases[canvasIndex].Pos1.Item2.ToString() + ".png";
+
+            //string fileNameWithPath = path + DateTime.Now.ToString().Replace("/", "-").Replace(" ", "- ").Replace(":", "") + ".png";
+
+            using (FileStream fs = new FileStream(path + fileName, FileMode.Create))
+            {
+                using (BinaryWriter bw = new BinaryWriter(fs))
+                {
+                    byte[] data = Convert.FromBase64String(image);
+                    bw.Write(data);
+                    bw.Close();
+                }
+            }
+            ActiveCanvases[canvasIndex].Image = fileName;
+        }
+
         public (string[], int[], int[]) getEntities()
         {
             var res1 = from e in ActiveEntities
@@ -358,15 +583,25 @@ namespace OnlineBuildingGame.Game
             return (res1.ToArray(), res2.ToArray(), res3.ToArray());
         }
 
-        public (string[], int[], int[]) getPlayerLocations()
+        public (string[], double[], double[]) getPlayerLocations(int mapId)
         {
-            var res1 = from x in ConnectedPlayers.Values
-                       select x.Name;
-            var res2 = from x in ConnectedPlayers.Values
-                      select x.PosY;
-            var res3 = from x in ConnectedPlayers.Values
+            List<PlayerLocationModel> locations;
+            if (WorldsWithPlayers.ContainsKey(mapId))
+            {
+                locations = WorldsWithPlayers[mapId].Values.ToList();
+            } else
+            {
+                Console.WriteLine("GameWorld\\getPlayerLocations: WorldsWithPlayers didn't have key: " + mapId);
+                return (new string[0], new double[0], new double[0]);
+            }
+
+            var players = from x in locations
+                       select x.Player;
+            var xPositions = from x in locations
+                      select x.PosX;
+            var yPositions = from x in locations
                        select x.PosX;
-            return (res1.ToArray(), res2.ToArray(), res3.ToArray());
+            return (players.ToArray(), xPositions.ToArray(), yPositions.ToArray());
         }
 
         public string[][][] getWorldSprites()
@@ -381,7 +616,7 @@ namespace OnlineBuildingGame.Game
                 }
             }
 
-            foreach (MapDataModel d in MainMap.ToArray())
+            foreach (MapDataModel d in Maps.ToList(WorldId))
             {
                 res[d.Layer][d.PosY][d.PosX] = TileSet[d.TileName].Img;
             }
@@ -401,6 +636,39 @@ namespace OnlineBuildingGame.Game
             var res = from x in ItemSet
                       select x.Value.Img;
             return res.ToArray();
+        }
+
+        public string[] GetCanvasImages()
+        {
+            var res = from x in ActiveCanvases
+                      select x.Image;
+            return res.ToArray();
+        }
+
+        public void AddPlayerToWorld(string player, string levelName)
+        {
+            using (var scope = _serviceProvider.CreateScope())
+            {
+                var _db = scope.ServiceProvider.GetService<GameDbContext>();
+                var map = _db.Maps.Where(m => m.Name == levelName);
+
+                if (map.Count() == 1)
+                {
+                    if (!WorldsWithPlayers.ContainsKey(map.First().MapId))
+                    {
+                        WorldsWithPlayers.Add(map.First().MapId, new Dictionary<string, PlayerLocationModel>());   
+                    }
+
+                    if (!WorldsWithPlayers[map.First().MapId].TryAdd(player, new PlayerLocationModel(player,
+                            map.First().MapId, map.First().SpawnX, map.First().SpawnY, map.First().SpawnZ)))
+                    {
+                        Console.WriteLine("GameWorld\\AddPlayerToWorld: TryAdd on WorldsWithPlayers failed for player: " + player + " with level: " + levelName);
+                    }
+                } else
+                {
+                    Console.WriteLine("GameWorld\\AddPlayerToWorld: found nothing in _db.Maps where name == " + levelName);
+                }
+            }
         }
 
         public void LoginPlayer(string player)
@@ -436,7 +704,7 @@ namespace OnlineBuildingGame.Game
                         hotbarId = hotbarIds.LastOrDefault() + 2;
                     }
 
-                    PlayerModel p = new PlayerModel(player, invId, hotbarId);
+                    PlayerModel p = new PlayerModel(player, WorldId, invId, hotbarId);
 
                     ActiveInventories.Add(invId, new List<InventoryDataModel>());
                     ActiveInventories.Add(hotbarId, new List<InventoryDataModel>());
@@ -448,6 +716,7 @@ namespace OnlineBuildingGame.Game
                     _db.SaveChanges();
 
                     ConnectedPlayers.Add(player, p);
+                    PlayersLastMoved.Add(player, DateTime.Now);
                 }
                 else
                 {
@@ -471,23 +740,21 @@ namespace OnlineBuildingGame.Game
                     }
 
                     ConnectedPlayers.Add(player, res.First());
+                    PlayersLastMoved.Add(player, DateTime.Now);
                 }
 
-                //GiveItems(player, new List<Item>() { new Item(5, ItemSet["SunflowerItem"]) });
-                //GiveItems(player, new List<Item>() { new Item(5, ItemSet["ChestItem"]) });
-                //GiveItems(player, new List<Item>() { new Item(1, ItemSet["GlovesItem"]), new Item(1, ItemSet["AxeItem"]), new Item(1, ItemSet["ShovelItem"])});
-                //GiveItems(player, new List<Item>() { new Item(1, ItemSet["PickaxeItem"]), new Item(1, ItemSet["SwordItem"]) });
+                GiveItems(player, new List<Item>() { new Item(5, ItemSet["StairsItem"]) });
+                GiveItems(player, new List<Item>() { new Item(5, ItemSet["ChestItem"]) });
+                GiveItems(player, new List<Item>() { new Item(1, ItemSet["GlovesItem"]), new Item(1, ItemSet["AxeItem"]), new Item(1, ItemSet["ShovelItem"])});
+                GiveItems(player, new List<Item>() { new Item(1, ItemSet["PickaxeItem"]), new Item(1, ItemSet["SwordItem"]) });
+                GiveItems(player, new List<Item>() { new Item(1, ItemSet["CanvasItem"]) });
+                GiveItems(player, new List<Item>() { new Item(1, ItemSet["PlankDoorItem"]) });
             }
         }
 
         public List<PlayerModel> GetConnectedPlayers()
         {
             return ConnectedPlayers.Values.ToList();
-        }
-
-        public void AddEntity(string itemName, int posY, int posX)
-        {
-            ActiveEntities.Add(new EntityModel(itemName, posY, posX, 1));
         }
 
         public void SwapItems(string player, string typeA, string typeB, int indexA, int indexB)
@@ -535,6 +802,10 @@ namespace OnlineBuildingGame.Game
             {
                 ActiveInventories[idA].Remove(itemA);
                 ActiveInventories[idB].Add(new InventoryDataModel(idB, itemA.ItemName, itemA.Amount, indexB));
+            } else if (itemA.Id == itemB.Id) 
+            {
+                ActiveInventories[idA].Remove(itemA);
+                ActiveInventories[idB][iB] = new InventoryDataModel(idB, itemA.ItemName, itemA.Amount + itemB.Amount, itemB.Position);
             } else
             {
                 ActiveInventories[idA][iA] = new InventoryDataModel(idA, itemB.ItemName, itemB.Amount, itemA.Position);
@@ -606,26 +877,21 @@ namespace OnlineBuildingGame.Game
             }
         }
 
-        public (int X, int Y) GetPosition(string player)
+        public (double X, double Y, int L) GetPosition(string player, int mapId)
         {
-            return (ConnectedPlayers[player].PosX, ConnectedPlayers[player].PosY);
-        }
+            if (WorldsWithPlayers.TryGetValue(mapId, out Dictionary<string, PlayerLocationModel> world))
+            {
+                if (world.TryGetValue(player, out PlayerLocationModel playerLocation))
+                {
+                    return (playerLocation.PosX, playerLocation.PosY, playerLocation.Layer);
+                }
+            }
 
+            return (0, 0, 1);
+        }
+         
         public string GetDirection(string player)
         {
-            Direction dir = ConnectedPlayers[player].Facing;
-            if (dir == Direction.North)
-            {
-                return "North";
-            }
-            if (dir == Direction.South)
-            {
-                return "South";
-            }
-            if (dir == Direction.East)
-            {
-                return "East";
-            }
             return "West";
         }
 
@@ -655,33 +921,100 @@ namespace OnlineBuildingGame.Game
 
             return msgs.ToArray();
         }
-            
-
-        public void Move(string name, int Vx, int Vy)
+        
+        public void ChangeDirection(string name, string direction)
         {
-            (int currentX, int currentY) = (ConnectedPlayers[name].PosX, ConnectedPlayers[name].PosY);
+            
+        }
 
-            Direction temp = ConnectedPlayers[name].Facing;
-
-            if (Vx != 0)
+        public void MoveLayer(int mapId, string name, int newLayer)
+        {
+            if (WorldsWithPlayers.TryGetValue(mapId, out Dictionary<string, PlayerLocationModel> players))
             {
-                ConnectedPlayers[name].Facing = (Direction)Vx;
+                if (players.TryGetValue(name, out PlayerLocationModel player))
+                {
+                    double normalizedX = Math.Round(player.PosX, MidpointRounding.ToEven);
+                    double normalizedY = Math.Round(player.PosY, MidpointRounding.ToEven);
+
+                    if (ValidPosition((int)normalizedX, (int)normalizedY, newLayer))
+                    {
+                        WorldsWithPlayers[mapId][name].Layer = newLayer;
+                    }
+                } 
+                else
+                {
+                    Console.WriteLine("GameWorld\\MoveLayer: WorldsWithPlayers[" + mapId + "] didn't contain key: " + name);
+                }
+            } 
+            else
+            {
+                Console.WriteLine("GameWorld\\MoveLayer: WorldsWithPlayers didn't contain key: " + mapId);
             }
+        }
 
-            if (Vy != 0)
+        public void Move(int mapId, string name, double Vx, double Vy)
+        {
+            if (WorldsWithPlayers.TryGetValue(mapId, out Dictionary<string, PlayerLocationModel> players))
             {
-                ConnectedPlayers[name].Facing = (Direction)(Vy * 10);
+                if (players.TryGetValue(name, out PlayerLocationModel player))
+                {
+                    double normalizedX = Math.Round(player.PosX, MidpointRounding.ToEven);
+                    double normalizedY = Math.Round(player.PosY, MidpointRounding.ToEven);
+
+                    double newX = player.PosX + Vx / 32;
+                    double newY = player.PosY + Vy / 32;
+
+                    if (ValidPosition((int)Math.Ceiling(newX), (int)Math.Ceiling(newY), player.Layer) &&
+                        ValidPosition((int)newX, (int)newY, player.Layer) &&
+                        ValidPosition((int)Math.Ceiling(newX), (int)newY, player.Layer) &&
+                        ValidPosition((int)newX, (int)Math.Ceiling(newY), player.Layer))
+                    {
+                        WorldsWithPlayers[mapId][name].PosX += Vx / 32;
+                        WorldsWithPlayers[mapId][name].PosY += Vy / 32;
+                        PlayersLastMoved[name] = DateTime.Now;
+                    }
+                    else
+                    {
+                        if (Math.Abs(normalizedX - player.PosX) <= 0.4)
+                        {
+                            WorldsWithPlayers[mapId][name].PosX = normalizedX;
+                        }
+
+                        if (Math.Abs(normalizedY - player.PosY) <= 0.4)
+                        {
+                            WorldsWithPlayers[mapId][name].PosY = normalizedY;
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("GameWorld\\Move: WorldsWithPlayers[" + mapId + "] didn't contain key: " + name);
+                }
             }
-
-            if (ConnectedPlayers[name].Facing != temp)
+            else
             {
-                return;
+                Console.WriteLine("GameWorld\\Move: WorldsWithPlayers didn't contain key: " + mapId);
             }
+        }
 
-            if (ValidPosition(currentX + Vx, currentY + Vy))
+        public void SetPlayerLocation(int mapId, string name, int newX, int newY)
+        {
+            if (WorldsWithPlayers.TryGetValue(mapId, out Dictionary<string, PlayerLocationModel> players))
             {
-                ConnectedPlayers[name].PosX += Vx;
-                ConnectedPlayers[name].PosY += Vy;
+                if (players.TryGetValue(name, out PlayerLocationModel player))
+                {
+                    if (ValidPosition(newX, newY, player.Layer))
+                    {
+                        WorldsWithPlayers[mapId][name].PosX = newX;
+                        WorldsWithPlayers[mapId][name].PosY = newY;
+                    }
+                } else
+                {
+                    Console.WriteLine("GameWorld\\SetPlayerLocation: WorldsWithPlayers[" + mapId + "] didn't contain key: " + name);
+                }
+            } else
+            {
+                Console.WriteLine("GameWorld\\SetPlayerLocation: WorldsWithPlayers didn't contain key: " + mapId);
             }
         }
 
@@ -695,28 +1028,6 @@ namespace OnlineBuildingGame.Game
         {
             int id = ConnectedPlayers[player].HotbarId;
             return ActiveInventories[id].ToArray();
-        }
-
-        public void SubtractItem(string player, string item, int hotbarIndex)
-        {
-            var playerHotbar = ActiveInventories[ConnectedPlayers[player].HotbarId];
-            var itemModel = playerHotbar.Where(i => i.Position == hotbarIndex).First();
-            int itemIndex = playerHotbar.IndexOf(itemModel);
-
-            if (itemIndex == -1)
-            {
-                return;
-            }
-
-            int newCount = itemModel.Amount - 1;
-            if (newCount <= 0)
-            {
-                playerHotbar[itemIndex] = new InventoryDataModel(0, "BlankItem", 1, hotbarIndex);
-            }
-            else
-            {
-                playerHotbar[itemIndex] = new InventoryDataModel(itemModel.Id, itemModel.ItemName, newCount, hotbarIndex);
-            }
         }
 
         public bool CanPlaceHere(int targetM, int targetN, int layer, bool isDrop)
@@ -735,15 +1046,14 @@ namespace OnlineBuildingGame.Game
                 return true;
             }
 
-            var targetTiles = MainMap.Where(t => t.PosY == targetM && t.PosX == targetN);
-            var target = targetTiles.Where(t => t.Layer == layer).FirstOrDefault();
+            var tiles = Maps.AccessGroup(WorldId, targetN, targetM);
 
-            if (target == null)
+            if (tiles.Count == 0)
             {
                 return false;
             }
 
-            foreach (MapDataModel d in targetTiles)
+            foreach (MapDataModel d in tiles)
             {
                 if (d.Layer > layer)
                 {
@@ -753,328 +1063,8 @@ namespace OnlineBuildingGame.Game
                     }
                 }
             }
+
             return true;
-        }
-
-        public void AlterTile(int targetM, int targetN, int layer, TileModel newTile)
-        {
-
-        }
-
-        public void UseItem(string action, string player, string item, int hotbarIndex, int targetM, int targetN)
-        {
-            if (action == "Use")
-            {
-                var res = FuncList[ItemSet[item].UseFunc]((player, item, hotbarIndex, targetM, targetN));
-            } else if (action == "Drop")
-            {
-                if (CanPlaceHere(targetM, targetN, 0, true))
-                {
-                    AddEntity(item, targetM, targetN);
-                    SubtractItem(player, item, hotbarIndex);
-                } 
-            }
-        }
-
-        public bool Nothing()
-        {
-            return false;
-        }
-
-        public bool Place(dynamic input)
-        {
-            if (input is (string, string, int, int, int))
-            {
-                string player = input.Item1;
-                string item = input.Item2;
-                int hotbarIndex = input.Item3;
-                int targetM = input.Item4;
-                int targetN = input.Item5;
-
-                if (!CanPlaceHere(targetM, targetN, 1, false))
-                {
-                    return false;
-                }    
-
-                var target = MainMap.Where(t => t.PosY == targetM && t.PosX == targetN).Where(t => t.Layer == 1).First();
-                int targetIndex = MainMap.IndexOf(target);
-
-                if (target == null)
-                {
-                    return false;
-                }
-
-                TileModel tile = TileSet[target.TileName];
-
-                if (tile.Type == TileTypes.Open)
-                {
-                    if (tile.SubType != TileSubTypes.Air && tile.SubType != TileSubTypes.Water)
-                    {
-                         if (ItemDataSet.TryGetValue(ItemSet[item].Id, out TileModel val))
-                        {
-                            MainMap[targetIndex] = new MapDataModel(WorldId, val.TileId, target.Layer, val.Name, target.PosY, target.PosX);
-
-                            SubtractItem(player, item, hotbarIndex);
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
-        public bool PlaceFloor(dynamic input)
-        {
-            if (input is (string, string, int, int, int))
-            {
-                string player = input.Item1;
-                string item = input.Item2;
-                int hotbarIndex = input.Item3;
-                int targetM = input.Item4;
-                int targetN = input.Item5;
-
-                if (!CanPlaceHere(targetM, targetN, 0, false))
-                {
-                    return false;
-                }
-
-                var target = MainMap.Where(t => t.PosY == targetM && t.PosX == targetN).Where(t => t.Layer == 0).First();
-                int targetIndex = MainMap.IndexOf(target);
-
-                if (target == null)
-                {
-                    return false;
-                }
-
-                TileModel tile = TileSet[target.TileName];
-
-                if (tile.TileId == TileSet["StoneFloor"].TileId)
-                {
-                    if (ItemSet[item].Id == ItemSet["DirtItem"].Id)
-                    {
-                        if (ItemDataSet.TryGetValue(ItemSet[item].Id, out TileModel val))
-                        {
-                            MainMap[targetIndex] = new MapDataModel(WorldId, val.TileId, target.Layer, val.Name, target.PosY, target.PosX);
-
-                            SubtractItem(player, item, hotbarIndex);
-                            return true;
-                        }
-                    }
-                }
-
-                if (target.TileId == TileSet["Dirt"].TileId)
-                {
-                    if (ItemDataSet.TryGetValue(ItemSet[item].Id, out TileModel val))
-                    {
-                        MainMap[targetIndex] = new MapDataModel(WorldId, val.TileId, target.Layer, val.Name, target.PosY, target.PosX);
-
-                        SubtractItem(player, item, hotbarIndex);
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        public bool Plant(dynamic input)
-        {
-            if (input is (string, string, int, int, int))
-            {
-                string player = input.Item1;
-                string item = input.Item2;
-                int hotbarIndex = input.Item3;
-                int targetM = input.Item4;
-                int targetN = input.Item5;
-
-                if (!CanPlaceHere(targetM, targetN, 0, false))
-                {
-                    return false;
-                }
-
-                var target = MainMap.Where(t => t.PosY == targetM && t.PosX == targetN).Where(t => t.Layer == 0).First();
-                int targetIndex = MainMap.IndexOf(target);
-
-                if (target == null)
-                {
-                    return false;
-                }
-
-                TileModel tile = TileSet[target.TileName];
-
-                if (tile.Type == TileTypes.Open)
-                {
-                    if (tile.SubType == TileSubTypes.Soil)
-                    {
-                        if (ItemDataSet.TryGetValue(ItemSet[item].Id, out TileModel val))
-                        {
-                            MainMap[targetIndex] = new MapDataModel(WorldId, val.TileId, target.Layer, val.Name, target.PosY, target.PosX);
-
-                            SubtractItem(player, item, hotbarIndex);
-
-                            if (item == "FlowerItem")
-                            {
-
-                            } else if (item == "SaplingItem")
-                            {
-                                ActivePlants.Add(targetM * cols + targetN, (3f, "Tree"));
-                            }
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
-        public bool UseTool(dynamic input)
-        {
-            if (input is (string, string, int, int, int))
-            {
-                string player = input.Item1;
-                string item = input.Item2;
-                int hotbarIndex = input.Item3;
-                int targetM = input.Item4;
-                int targetN = input.Item5;
-
-                if (targetM < 0 || targetM >= rows)
-                {
-                    return false;
-                }
-                if (targetN < 0 || targetN >= cols)
-                {
-                    return false;
-                }
-
-                var targetTiles = MainMap.Where(t => t.PosY == targetM && t.PosX == targetN);
-
-                if (item == "AxeItem")
-                {
-                    var targetTile = targetTiles.Where(t => t.Layer == 1).First();
-                    int tileIndex = MainMap.IndexOf(targetTile);
-
-                    TileModel tile = TileSet[targetTile.TileName];
-
-                    if (tile.SubType == TileSubTypes.Wood)
-                    {
-                        MainMap[tileIndex] = new MapDataModel(WorldId, TileSet["Air"].TileId, 1, TileSet["Air"].Name, targetM, targetN);
-
-                        if (TileDataSet.TryGetValue(tile.TileId, out List<Item> val))
-                        {
-                            GiveItems(player, val);
-                        }
-                        return true;
-                    }
-                } else if (item == "ShovelItem")
-                {
-                    var targetTile = targetTiles.Where(t => t.Layer == 0).First();
-                    int tileIndex = MainMap.IndexOf(targetTile);
-
-                    TileModel tile = TileSet[targetTile.TileName];
-
-                    if (tile.SubType == TileSubTypes.Soil)
-                    {
-                        if (tile.TileId == TileSet["Dirt"].TileId)
-                        {
-                            MainMap[tileIndex] = new MapDataModel(WorldId, TileSet["StoneFloor"].TileId, 0, TileSet["StoneFloor"].Name, targetM, targetN);
-                        } else
-                        {
-                            MainMap[tileIndex] = new MapDataModel(WorldId, TileSet["Dirt"].TileId, 0, TileSet["Dirt"].Name, targetM, targetN);
-                        }
-
-                        if (TileDataSet.TryGetValue(tile.TileId, out List<Item> val))
-                        {
-                            GiveItems(player, val);
-                        }
-                        return true;
-                    }
-                } else if (item == "PickaxeItem")
-                {
-                    var targetTile = targetTiles.Where(t => t.Layer == 1).First();
-                    int tileIndex = MainMap.IndexOf(targetTile);
-
-                    TileModel tile = TileSet[targetTile.TileName];
-
-                    if (tile.Type == TileTypes.Sturdy && tile.SubType == TileSubTypes.Stone)
-                    {
-                        MainMap[tileIndex] = new MapDataModel(WorldId, TileSet["Air"].TileId, 1, TileSet["Air"].Name, targetM, targetN);
-
-                        if (TileDataSet.TryGetValue(tile.TileId, out List<Item> val))
-                        {
-                            GiveItems(player, val);
-                        }
-                        return true;
-                    }
-                } else if (item == "GlovesItem")
-                {
-                    var targetTile = targetTiles.Where(t => t.Layer == 1).First();
-                    int tileIndex = MainMap.IndexOf(targetTile);
-
-                    TileModel tile = TileSet[targetTile.TileName];
-
-                    if (tile.SubType == TileSubTypes.Loose)
-                    {
-                        MainMap[tileIndex] = new MapDataModel(WorldId, TileSet["Air"].TileId, 1, TileSet["Air"].Name, targetM, targetN);
-
-                        if (TileDataSet.TryGetValue(tile.TileId, out List<Item> val))
-                        {
-                            GiveItems(player, val);
-                        }
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        public bool UseWeapon(dynamic input)
-        {
-            if (input is (string, string, int, int, int))
-            {
-                string player = input.Item1;
-                string item = input.Item2;
-                int hotbarIndex = input.Item3;
-                int targetM = input.Item4;
-                int targetN = input.Item5;
-
-                if (targetM < 0 || targetM >= rows)
-                {
-                    return false;
-                }
-                if (targetN < 0 || targetN >= cols)
-                {
-                    return false;
-                }
-
-                Direction facing = ConnectedPlayers[player].Facing;
-                int Vx = 0;
-                int Vy = 0;
-
-                if (facing == Direction.North)
-                {
-                    Vy = -1;
-                } else if (facing == Direction.South)
-                {
-                    Vy = 1;
-                } else if (facing == Direction.East)
-                {
-                    Vx = 1;
-                } else if (facing == Direction.West)
-                {
-                    Vx = -1;
-                }            
-
-                if (item == "SwordItem")
-                {
-                    foreach (PlayerModel p in ConnectedPlayers.Values)
-                    {
-                        if (p.PosY == targetM && p.PosX == targetN)
-                        {
-                            Move(p.Name, Vx, Vy);
-                        }
-                    }
-                }
-            }
-            return false;
         }
     }
 }

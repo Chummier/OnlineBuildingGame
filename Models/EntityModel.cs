@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace OnlineBuildingGame.Models
 {
@@ -11,15 +7,19 @@ namespace OnlineBuildingGame.Models
         [Key]
         public int Id { get; set; }
         public string Name { get; set; }
-        public int PosY { get; set; }
+        public int MapId { get; set; }
         public int PosX { get; set; }
+        public int PosY { get; set; }
+        public int Layer { get; set; }
         public int Amount { get; set; }
 
-        public EntityModel(string name, int posY, int posX, int amount)
+        public EntityModel(string name, int mapId, int posY, int posX, int layer, int amount)
         {
             Name = name;
+            MapId = mapId;
             PosY = posY;
             PosX = posX;
+            Layer = layer;
             Amount = amount;
         }
     }

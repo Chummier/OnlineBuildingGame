@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.ComponentModel.DataAnnotations;
-using OnlineBuildingGame.Game;
+﻿using System.ComponentModel.DataAnnotations;
+
 
 namespace OnlineBuildingGame.Models
 {
@@ -21,31 +17,22 @@ namespace OnlineBuildingGame.Models
         [Key]
         public int Id { get; set; }
         public string Name { get; set; }
-        public int PosX { get; set; }
-        public int PosY { get; set; }
-        public Direction Facing { get; set; }
-        public int Health { get; set; }
+        public int MapId { get; set; }
         public int InventoryId { get; set; }
         public int HotbarId { get; set; }
 
         public PlayerModel()
         {
             Name = "";
-            PosX = 0;
-            PosY = 0;
-            Facing = Direction.South;
-            Health = 100;
+            MapId = 0;
             InventoryId = 0;
             HotbarId = 0;
         }
 
-        public PlayerModel(string name, int inventoryId, int hotbarId)
+        public PlayerModel(string name, int mapId, int inventoryId, int hotbarId)
         {
             Name = name;
-            PosX = 0;
-            PosY = 0;
-            Facing = Direction.South;
-            Health = 100;
+            MapId = mapId;
             InventoryId = inventoryId;
             HotbarId = hotbarId;
         }

@@ -9,20 +9,45 @@
 }
 
 <style>
-    .navbar {
-        background-color: white;
+    * {
+        user-select: none;
     }
 
-    .navbar a {
+    .navbar {
+        position: absolute;
+        background-color: white;
+        z-index: 1;
+    }
+
+    .navbar li {
         color: black;
+        text-align: right;
+        float: right;
+        list-style-type: none;
     }
 
     .inventory{
         position: absolute;
     }
 
+    .inventory td{
+        background-color: white;
+    }
+
     .hotbar{
         position:absolute;
+        top: 80%;
+        right: 50%;
+    }
+
+    .hotbar td{
+        background-color: white;
+    }
+
+    body{
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
     }
 
     td{
@@ -35,6 +60,10 @@
         position: absolute;
     }
 
+    .drawingCanvas{
+        position: absolute;
+    }
+
     .chat {
         background-color: azure;
         position: absolute;
@@ -42,23 +71,32 @@
     }
 </style>
 
-<header>
-    <div class="navbar">
-        <a><input id="ChatButton" type="button" value="Chat"/></a>
-        <a><input id="InventoryButton" type="button" value="Inventory" /></a>
-        <a><input id="MenuButton" type="button" value="Menu" /></a>
-        <a>
-            <input type="range" min="1" max="6" value="3" id="ScaleSlider" />
-        </a>
-        <input id="Username" value="@ViewData["UserName"]" hidden disabled />
-    </div>
-</header>
-
 <body>
+    <header>
+        <div class="navbar">
+            <ul>
+                <li><input id="InventoryButton" type="button" value="Inventory" /></li>
+                <li><input id="ChatButton" type="button" value="Chat" /></li>
+                <li><input id="MenuButton" type="button" value="Menu" /></li>
+                <li><input type="range" min="1" max="6" value="3" id="ScaleSlider" /></li>
+                <li><input id="Username" value="@ViewData["UserName"]" hidden disabled /></li>
+            </ul>
+        </div>
+    </header>
+
     <div>
-        <canvas class="gameCanvas" id="game" width="1000" height="800"></canvas>
-        <canvas class="gameCanvas" id="entity" width="1000" height="800"></canvas>
-        <canvas class="gameCanvas" id="player" width="1000" height="800"></canvas>
+        <canvas class="gameCanvas" id="game" width="1000" height="1000"></canvas>
+        <canvas class="gameCanvas" id="entity" width="1000" height="1000"></canvas>
+        <canvas class="gameCanvas" id="player" width="1000" height="1000"></canvas>
+        <canvas class="gameCanvas" id="canvas" width="1000" height="1000"></canvas>
+        <canvas class="gameCanvas" id="direction" width="1000" height="1000"></canvas>
+
+        <div id="drawingTools" hidden>
+            <canvas class="drawingCanvas" id="drawing" width="1000" height="1000"></canvas>
+            <input class="drawingCanvas" id="CloseDrawingCanvas" type="button" value="✖" />
+            <input class="drawingCanvas" id="ClearDrawingCanvas" type="button" value="CLEAR" />
+        </div>
+
         <table class="inventory" id="InventoryTable">
             @for (int i = 0; i < inventoryRows; i++)
             {
@@ -92,12 +130,8 @@
                 }
             </tr>
         </table>
-
         <input class="chat" id="chatInput" />
-
         <div id="chat"></div>
-
-
     </div>
 </body>
 
@@ -110,6 +144,9 @@
             {
                 <img id="@ItemImageList[i]" src="~/images/items/@ItemImageList[i]" hidden />
             }
+    <div id="imgs">
+        <!--<img id="1-5" src="~/images/canvases/1-5.png" hidden />-->
+    </div>
 </footer>
 
 <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>

@@ -12,11 +12,13 @@ namespace OnlineBuildingGame.Hubs
     public class GameHub: Hub
     {
         private readonly GameWorld _world;
+        private readonly GameLogic _gameLogic;
         private readonly LoginManager _loginManager;
 
-        public GameHub(GameWorld world, LoginManager loginManager)
+        public GameHub(GameWorld world, GameLogic gameLogic, LoginManager loginManager)
         {
             _world = world;
+            _gameLogic = gameLogic;
             _loginManager = loginManager;
         }
 
@@ -33,12 +35,32 @@ namespace OnlineBuildingGame.Hubs
 
         public async Task GetMovementInput(int Vx, int Vy)
         {
-            _world.Move(Context.User.Identity.Name, Vx, Vy);
+            _world.Move(0, Context.User.Identity.Name, Vx, Vy);
+        }
+
+        public async Task GetDirection(string direction)
+        { 
+            _world.ChangeDirection(Context.User.Identity.Name, direction);
         }
 
         public async Task GetItemUse(string Action, string Item, int Index, int TargetM, int TargetN)
         {
-            _world.UseItem(Action, Context.User.Identity.Name, Item, Index, TargetM, TargetN);
+            _gameLogic.UseItem(Action, Context.User.Identity.Name, Item, Index, TargetM, TargetN);
+        }
+
+        public async Task GetTileUse(int TargetM, int TargetN)
+        {
+            _gameLogic.UseTile(Context.User.Identity.Name, TargetM, TargetN);
+        }
+
+        public async Task StopUsingTile()
+        {
+            _world.removeTileInUse(Context.User.Identity.Name);
+        }
+
+        public async Task GetDrawingData(string data, int targetM, int targetN)
+        {
+            _world.updateCanvasImage(Context.User.Identity.Name, data, targetM, targetN);
         }
 
         public async Task SwapItems(string typeA, string typeB, int indexA, int indexB)

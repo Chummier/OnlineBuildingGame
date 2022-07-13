@@ -28,6 +28,12 @@ namespace OnlineBuildingGame.Migrations.GameDb
                     b.Property<int>("Amount")
                         .HasColumnType("int");
 
+                    b.Property<int>("Layer")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MapId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .HasColumnType("nvarchar(max)");
 
@@ -127,15 +133,57 @@ namespace OnlineBuildingGame.Migrations.GameDb
                     b.Property<int>("DimY")
                         .HasColumnType("int");
 
+                    b.Property<int>("DimZ")
+                        .HasColumnType("int");
+
                     b.Property<int>("MapId")
                         .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Owner")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SpawnX")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SpawnY")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SpawnZ")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.ToTable("Maps");
+                });
+
+            modelBuilder.Entity("OnlineBuildingGame.Models.PlayerLocationModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<int>("Layer")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MapId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Player")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<double>("PosX")
+                        .HasColumnType("float");
+
+                    b.Property<double>("PosY")
+                        .HasColumnType("float");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PlayerLocations");
                 });
 
             modelBuilder.Entity("OnlineBuildingGame.Models.PlayerModel", b =>
@@ -145,19 +193,40 @@ namespace OnlineBuildingGame.Migrations.GameDb
                         .HasColumnType("int")
                         .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    b.Property<int>("Facing")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Health")
-                        .HasColumnType("int");
-
                     b.Property<int>("HotbarId")
                         .HasColumnType("int");
 
                     b.Property<int>("InventoryId")
                         .HasColumnType("int");
 
+                    b.Property<int>("MapId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Players");
+                });
+
+            modelBuilder.Entity("OnlineBuildingGame.Models.ProtectedTileModel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<string>("CoOwner")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Layer")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MapId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Owner")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("PosX")
@@ -168,7 +237,7 @@ namespace OnlineBuildingGame.Migrations.GameDb
 
                     b.HasKey("Id");
 
-                    b.ToTable("Players");
+                    b.ToTable("ProtectedTiles");
                 });
 #pragma warning restore 612, 618
         }

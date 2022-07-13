@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Migrations\GameDb\" />
+    <Folder Include="wwwroot\images\canvases\" />
   </ItemGroup>
 
 </Project>

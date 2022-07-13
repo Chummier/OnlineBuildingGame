@@ -5,7 +5,7 @@ namespace OnlineBuildingGame
 {
     public class LoginManager
     {
-        private Dictionary<string, int> ConnectedUsers;
+        private Dictionary<string, int> ConnectedUsers; // <Username, #ActiveConnections>
 
         public LoginManager()
         {

@@ -1,9 +1,9 @@
 ﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
-@{ 
+@{
     List<string> users = ViewData["Users"] as List<string>;
 }
 <style>
-    body{
+    body {
         background-color: black;
         color: white;
     }
@@ -12,9 +12,10 @@
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
+        height: 33%;
     }
 
-    .text{
+    .text {
         color: white;
     }
 </style>
@@ -23,35 +24,31 @@
     <div>
         <h1>Welcome to the Online Building Game!</h1>
     </div>
+    <h2>Login/Register</h2>
     <div class="flex-container">
         <div>
-            <h2 id="toggleLogin">Log in:</h2>
             <div id="loginPanel">
-                <form asp-controller="Pages" asp-action="Login" method="post">
+                <form asp-controller="Pages" method="post">
                     <input name="Name" class="form-control" value="Tim" />
-                    <input name="Password" class="form-control" value="a12"/>
-                    <button id="loginButton" type="submit">Submit</button>
+                    <input name="Password" class="form-control" value="a12" />
+                    <button id="hostButton" asp-action="Host" type="submit">Host</button>
+                    <button id="joinButton" asp-action="Join" type="submit">Join</button>
                 </form>
             </div>
         </div>
 
         <div>
-            <h2 id="toggleRegister">Register:</h2>
-            <div id="registerPanel">
-                <form asp-controller="Pages" asp-action="Register" method="post">
-                    <input name="Name" class="form-control" />
-                    <input name="Password" class="form-control" />
-                    <button id="registerButton" type="submit">Submit</button>
-                </form>
-            </div>
-        </div>
-
-        <div>
-            @foreach(string u in users)
+            @foreach (string u in users)
             {
                 <h2>@u : a12</h2>
             }
         </div>
     </div>
 
+    <div>
+        <canvas id="gamePreview" width="1000" height="1000"></canvas>
+    </div>
 </body>
+
+<script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
+<script src="~/js/index.js"></script>

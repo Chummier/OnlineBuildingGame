@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace OnlineBuildingGame.Models
@@ -14,19 +10,19 @@ namespace OnlineBuildingGame.Models
         public int Id { get; set; }
         public int MapId { get; set; }
         public int TileId { get; set; }
-        public int Layer { get; set; }
         public string TileName { get; set; }
-        public int PosY { get; set; }
         public int PosX { get; set; }
+        public int PosY { get; set; }
+        public int Layer { get; set; }
 
-        public MapDataModel(int mapId, int tileId, int layer, string tileName, int posY, int posX)
+        public MapDataModel(int mapId, int tileId, string tileName, int posX, int posY, int layer)
         {
             MapId = mapId;
             TileId = tileId;
-            Layer = layer;
             TileName = tileName;
-            PosY = posY;
             PosX = posX;
+            PosY = posY;
+            Layer = layer;
         }
     }
 }

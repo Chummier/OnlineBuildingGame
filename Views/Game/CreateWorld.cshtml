@@ -1,0 +1,93 @@
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<style>
+    body {
+        background-color: black;
+        color: white;
+    }
+
+    ol{
+        list-style-type: none;
+    }
+
+    li{
+        margin: 10px;
+    }
+
+    li input {
+        font-size: 2em;
+    }
+
+    .flex-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        height: 33%;
+    }
+
+    .text {
+        color: white;
+    }
+</style>
+
+<body>
+    <div>
+        <h1>Create a world!</h1>
+    </div>
+
+    <div class="flex-container">
+        <form asp-controller="Game" method="post">
+            <div>
+                <input id="worldName" value="" placeholder="World Name" />
+                <label for="worldType">World Type: </label>
+                <select id="worldType" name="worldType">
+                    <option value="Forest">Forest</option>
+                    <option value="Desert">Desert</option>
+                    <option value="Alpine">Alpine</option>
+                    <option value="Coastal">Coastal</option>
+                </select>
+                <input id="worldSeed" value="" placeholder="(OPTIONAL) World Seed" />
+            </div>
+            
+            <div>
+                <input id="selectedLevel" name="SelectedLevel" class="form-control" value="0" hidden contenteditable="false" />
+                <label for="worldSelect">Select World to Override: </label>
+                <ol id="worldSelect">
+                    <li><input class="worldButton" id="0" value="World 1" type="button"></li>
+                    <li><input class="worldButton" id="1" value="World 2" type="button"></li>
+                    <li><input class="worldButton" id="2" value="World 3" type="button"></li>
+                    <li><input class="worldButton" id="3" value="World 4" type="button"></li>
+                    <li><input class="worldButton" id="4" value="World 5" type="button"></li>
+                </ol>
+                <button id="createButton" asp-action="Main" type="submit">Create World</button>
+            </div>
+        </form>
+    </div>
+
+    <div>
+        <canvas id="gamePreview" width="1000" height="1000"></canvas>
+    </div>
+</body>
+
+<script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
+<script src="~/js/index.js"></script>
+<script>
+    var worldButtons = document.getElementsByClassName("worldButton");
+    var selectedLevel = document.getElementById("selectedLevel");
+
+    function HighlightItemInList(index, list) {
+        for (let i = 0; i < list.length; i++) {
+            list[i].style.border = "none";
+        }
+        list[index].style.border = "thick solid #0000FF";
+    }
+
+    HighlightItemInList(0, worldButtons);
+
+    for (let i = 0; i < worldButtons.length; i++) {
+        worldButtons[i].addEventListener("click", function (event) {
+            selectedLevel.value = this.id;
+            HighlightItemInList(i, worldButtons);
+        });
+    }
+</script>

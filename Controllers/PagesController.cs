@@ -37,33 +37,53 @@ namespace OnlineBuildingGame.Controllers
                             select u.UserName;
                 ViewData["Users"] = users.ToList();
                 return View();
-            }
-            
+            } 
         }
 
-        [HttpPost]
-        public async Task<IActionResult> Login()
-        { 
-            var res = await _signInManager.PasswordSignInAsync(Name, Password, isPersistent: false, lockoutOnFailure: false);
-            if (res.Succeeded)
-            {
-                return RedirectToAction("Main", "Game");
-            }
-            return RedirectToAction("Index");
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Register()
+        public async Task<bool> LoginOrRegister(string name, string password)
         {
-            IdentityUser newUser = new IdentityUser { UserName = Name };
-            var res = await _userManager.CreateAsync(newUser, Password);
-            
-            if (res.Succeeded)
+            var resSM = await _signInManager.PasswordSignInAsync(name, password, isPersistent: false, lockoutOnFailure: false);
+            if (resSM.Succeeded)
             {
-                await _signInManager.SignInAsync(newUser, isPersistent: false);
-                return RedirectToAction("Main", "Game");
+                return true;
+            } else
+            {
+                IdentityUser newUser = new IdentityUser { UserName = name };
+                var resUM = await _userManager.CreateAsync(newUser, password);
+                if (resUM.Succeeded)
+                {
+                    await _signInManager.SignInAsync(newUser, isPersistent: false);
+                    return true;
+                } else
+                {
+                    return false;
+                }
             }
-            return RedirectToAction("Index");
+        }
+
+        public async Task<IActionResult> Host()
+        {
+            var res = await LoginOrRegister(Name, Password);
+            if (res)
+            {
+                return RedirectToAction("Host", "Game");
+            }
+            else
+            {
+                return RedirectToAction("Index");
+            }
+        }
+
+        public async Task<IActionResult> Join()
+        {
+            var res = await LoginOrRegister(Name, Password);
+            if (res)
+            {
+                return RedirectToAction("Join", "Game");
+            } else
+            {
+                return RedirectToAction("Index");
+            }
         }
     }
 }
